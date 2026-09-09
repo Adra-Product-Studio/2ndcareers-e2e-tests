@@ -23,4 +23,15 @@ test.describe("Professional - 2C agents", () => {
     await agents.goto();
     await agents.checkCards();
   });
+
+  test("Career Copilots page loads (does not spend a search run)", async () => {
+    const agents = new ProfessionalAgentsPage(session.page);
+    await agents.checkCareerCopilotsPage();
+  });
+
+  // Known bug: the Rebuild link 404s - see checkRebuildResumeLinkWorks() in AgentsPage.js.
+  test("Rebuild link leads to a working page", async () => {
+    const agents = new ProfessionalAgentsPage(session.page);
+    await agents.checkRebuildResumeLinkWorks();
+  });
 });

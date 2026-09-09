@@ -29,4 +29,26 @@ test.describe("Professional - jobs", () => {
     await jobs.goto();
     await jobs.checkPageElements();
   });
+
+  test("Recommended tab loads (0 AI-matched jobs for this account)", async () => {
+    const jobs = new ProfessionalJobsPage(session.page);
+    await jobs.gotoRecommendedTab();
+  });
+
+  test("Applied tab loads with the expected keys and values", async () => {
+    const jobs = new ProfessionalJobsPage(session.page);
+    await jobs.gotoAppliedTab();
+  });
+
+  test("Saved tab loads with the expected keys and values", async () => {
+    const jobs = new ProfessionalJobsPage(session.page);
+    await jobs.gotoSavedTab();
+  });
+
+  test("clicking a job opens its detail pane with matching content", async () => {
+    const jobs = new ProfessionalJobsPage(session.page);
+    await jobs.goto();
+    const job = await jobs.openFirstJobDetail();
+    await jobs.checkJobDetailPane(job.job_title);
+  });
 });
