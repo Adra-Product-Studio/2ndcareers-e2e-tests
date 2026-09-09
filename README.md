@@ -1,6 +1,6 @@
 # 2nd Careers - E2E Test Suite
 
-Playwright automation for the [2ndcareers-frontend](https://github.com/AdraProductStudio/2ndcareers-frontend) app.
+Playwright automation for the [2ndcareers-frontend](https://github.com/Adra-Product-Studio/2ndcareers-frontend) app.
 This repo is checked out as a **git submodule** inside that app (at `e2e-tests/`), so it always
 sits next to the app code it tests while keeping its own dependencies isolated.
 
