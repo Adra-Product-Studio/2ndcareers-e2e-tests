@@ -35,9 +35,14 @@ const OPEN_REPORT = process.env.PW_OPEN_REPORT === "true";
 
 module.exports = defineConfig({
   testDir: "./tests",
-  // Generous enough to cover a cold Turbopack compile of the post-login route on a local
-  // dev server (see tests/auth/login.shared.js) - a built staging/CI run finishes well under this.
+  // Generous enough to cover a cold Turbopack compile of the page under test on a local dev
+  // server (each spec navigates fresh, see pages/professional/*.js) - a built staging/CI run
+  // finishes well under this.
   timeout: 60 * 1000,
+  // Required: tests/professional/*.spec.js are numbered (01-09) and depend on running in that
+  // exact order - 01-login.spec.js saves a storageState file that every later file's
+  // beforeAll loads (see support/sharedPage.js) to start already authenticated. Multiple
+  // workers or fullyParallel would run files out of order or concurrently and break that.
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

@@ -1,4 +1,5 @@
 // @ts-check
+const { waitForApiData, waitForFailedApiData } = require("../support/apiEnvelope");
 
 /**
  * Page Object for the "Sign in to 2nd Careers" page (app/(routes)/(auth)/page.js in the
@@ -35,6 +36,23 @@ class LoginPage {
   async submitCredentials(credentials) {
     await this.fillCredentials(credentials);
     await this.submit();
+  }
+
+  /**
+   * Submits and validates the failure envelope from POST /login - verified live:
+   * { data: {}, error_code: 401, message: "<string>", success: false }
+   */
+  async submitInvalidAndWaitForFailure(credentials) {
+    return waitForFailedApiData(this.page, /\/login$/, () => this.submitCredentials(credentials));
+  }
+
+  /**
+   * Submits and validates the success envelope from POST /login - verified live:
+   * { data: { Registration_status, access_token, payment_status, pricing_category,
+   *   resume_builder_model, user_role }, error_code: 0, message, success: true }
+   */
+  async submitValidAndWaitForSuccess(credentials) {
+    return waitForApiData(this.page, /\/login$/, () => this.submitCredentials(credentials));
   }
 }
 
