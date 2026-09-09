@@ -107,6 +107,19 @@ charge.
 
 `.github/workflows/e2e-tests.yml` in the main repo:
 
+- Checks out this repo, since it's **private**: GitHub's default `GITHUB_TOKEN` can only ever
+  see the repo the workflow runs in, never another repo - even a private one in the same org -
+  so a plain submodule checkout 404s on it. The workflow instead authenticates just the
+  submodule fetch with a fine-grained Personal Access Token, kept as the `E2E_REPO_PAT` secret
+  on `Adra-Product-Studio/2ndcareers-frontend`. To (re)create it:
+  1. GitHub -> your avatar -> Settings -> Developer settings -> Personal access tokens ->
+     Fine-grained tokens -> Generate new token.
+  2. Resource owner: `Adra-Product-Studio`. Repository access: "Only select repositories" ->
+     `2ndcareers-e2e-tests` (this repo only - not the main frontend repo).
+  3. Permissions: Repository permissions -> Contents -> **Read-only**. Nothing else needed.
+  4. Set an expiration and generate it, then add it as a secret named `E2E_REPO_PAT` on the
+     `2ndcareers-frontend` repo (Settings -> Secrets and variables -> Actions -> New repository
+     secret). It'll need regenerating whenever it expires.
 - Runs this suite on every push, using `PLAYWRIGHT_BASE_URL` and the per-role
   `*_TEST_EMAIL` / `*_TEST_PASSWORD` GitHub Actions secrets.
 - Converts the HTML report to a PDF (`npm run report:pdf`) and uploads it as a build artifact
