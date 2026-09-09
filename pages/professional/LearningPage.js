@@ -98,24 +98,31 @@ class ProfessionalLearningPage {
     return this._checkSeeAllVisibilityFollowsCountRule(this.learnLiveTitle);
   }
 
-  /** Clicks On Demand's "See all N videos" text - a real navigation to a see_all sub-page. */
+  /**
+   * Clicks On Demand's "See all N videos" text - a real navigation to a see_all sub-page.
+   * That page mounts in a "loading" state (skeleton cards, no "Back to Learnings" button yet -
+   * confirmed live in app/(routes)/professional/learning/see_all/page.js) until its own listing
+   * endpoint resolves, so the click is wrapped in waitForApiData for that endpoint rather than
+   * asserting on the button right away - this section's own listing call can legitimately take
+   * longer than a plain UI-assertion timeout would allow.
+   */
   async goToOnDemand() {
     await this.onDemandTitle.scrollIntoViewIfNeeded();
-    await this.page.getByText(/See all \d+ videos/).click();
+    await waitForApiData(this.page, /\/professional_community/, () => this.page.getByText(/See all \d+ videos/).click());
     await this.page.waitForURL(/\/learning\/see_all\?q=recording/);
     await this._checkSeeAllSubPage("On Demand");
   }
 
   async goToResources() {
     await this.resourcesTitle.scrollIntoViewIfNeeded();
-    await this.page.getByText(/See all \d+ Resources/).click();
+    await waitForApiData(this.page, /\/professional_learning/, () => this.page.getByText(/See all \d+ Resources/).click());
     await this.page.waitForURL(/\/learning\/see_all\?q=resources/);
     await this._checkSeeAllSubPage("Resources");
   }
 
   async goToPerspectives() {
     await this.perspectivesTitle.scrollIntoViewIfNeeded();
-    await this.page.getByText(/See all \d+ articles/).click();
+    await waitForApiData(this.page, /\/professional_get_perspectives/, () => this.page.getByText(/See all \d+ articles/).click());
     await this.page.waitForURL(/\/learning\/see_all\?q=perspectives/);
     await this._checkSeeAllSubPage("Perspectives");
   }

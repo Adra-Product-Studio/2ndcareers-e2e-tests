@@ -36,6 +36,11 @@ test.describe("Professional - full journey", () => {
     await home.checkCards();
   });
 
+  test("Notification bell opens and closes the notifications panel", async () => {
+    const header = new HeaderMenu(session.page);
+    await header.checkNotificationsPanel();
+  });
+
   test("Home's COMMUNITY card opens the external app in a new tab", async () => {
     // Verified live: this card - and the top nav's "Community" link - both go off-app to
     // https://app.2ndcareers.com in a new tab, not to the (still-live, but now unreachable by
@@ -63,6 +68,12 @@ test.describe("Professional - full journey", () => {
   });
 
   test("On Demand / Resources / Perspectives open their own listing pages", async () => {
+    // Three full round-trips (see_all -> Back to Learnings, x3), each waiting on its own listing
+    // endpoint against the shared dev API - seen live taking anywhere from a few seconds to
+    // nearly a minute depending on that backend's load, so this gets more headroom than the
+    // suite's default per-test timeout.
+    test.setTimeout(120_000);
+
     const learning = new ProfessionalLearningPage(session.page);
 
     await learning.goToOnDemand();
@@ -100,6 +111,24 @@ test.describe("Professional - full journey", () => {
     await session.page.waitForURL(/\/all_jobs/);
     const job = await jobs.openFirstJobDetail();
     await jobs.checkJobDetailPane(job.job_title);
+  });
+
+  test("Jobs: search filters the list, then clears back to the full list", async () => {
+    const jobs = new ProfessionalJobsPage(session.page);
+    const { filteredCount, restoredCount } = await jobs.searchFor("developer");
+    expect(filteredCount).toBeLessThan(restoredCount);
+  });
+
+  test("Jobs: Filter panel shows every field and applies without changing results", async () => {
+    const jobs = new ProfessionalJobsPage(session.page);
+    await jobs.checkFilterPanel();
+  });
+
+  test("Jobs: Save then Remove a job, leaving the account's saved list untouched", async () => {
+    const jobs = new ProfessionalJobsPage(session.page);
+    await jobs.goto();
+    const job = await jobs.openFirstJobDetail();
+    await jobs.saveThenRemoveJob(job.job_title);
   });
 
   test("Jobs -> 2C Agents, via nav link: cards and Career Copilots", async () => {

@@ -21,6 +21,8 @@ class HeaderMenu {
     this.page = page;
     this.headerButtons = page.getByRole("banner").getByRole("button");
     this.notificationsButton = this.headerButtons.first();
+    this.notificationsPanelTitle = page.getByText("Notifications", { exact: true });
+    this.clearAllButton = page.getByRole("button", { name: "Clear All" });
     this.profileMenuButton = this.headerButtons.filter({ has: page.getByAltText("user image") });
     this.homeNavLink = page.locator("#professional_nav_home_link");
     this.jobsNavLink = page.locator("#professional_nav_jobs_link");
@@ -54,6 +56,17 @@ class HeaderMenu {
   async goToAgents() {
     await this.agentsNavLink.click();
     await this.page.waitForURL(/\/professional\/2c_agent$/);
+  }
+
+  /** Opens the notification bell (a real toggle - verified live, the same button closes it
+   * again, just with a brief animation delay), checks the panel content, then closes it. */
+  async checkNotificationsPanel() {
+    await this.notificationsButton.click();
+    await expect(this.notificationsPanelTitle).toBeVisible();
+    await expect(this.clearAllButton).toBeVisible();
+
+    await this.notificationsButton.click();
+    await expect(this.notificationsPanelTitle).toBeHidden();
   }
 
   /** GET /user_dashboard_details backs the notification count + avatar on every page. */
