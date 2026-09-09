@@ -96,6 +96,25 @@ test.describe("Professional - login", () => {
     // A cold local dev server can still be compiling /professional/home on first visit.
     await expect(page).toHaveURL(new RegExp(redirectPath.replace(/\//g, "\\/")), { timeout: 45000 });
 
+    // The "Navi" chatbot (app/_chatbot/page.js) auto-opens itself in a maximized overlay via a
+    // one-shot 15-second timer armed right after login (services/auth/index.js), cleared once
+    // Home finishes loading (services/professional/index.js) - a race that CI's own PW_SLOWMO
+    // pacing (and a real backend, not localhost) can make the timer win instead. Confirmed live
+    // (both locally and on CI) that once it opens, its `.chatbot_container.open` subtree
+    // intercepts pointer events for the WHOLE viewport, not just where its card is drawn, and
+    // every click for the rest of this suite's one continuous session then hangs retrying
+    // against that invisible blocker until the test timeout - it never closes on its own, and
+    // this suite deliberately never does the one thing that does reset it (a hard reload).
+    // addStyleTag here (not addInitScript on the context) is deliberate: confirmed live, Next.js
+    // replaces the whole document again a moment after this very first load finishes (a second
+    // "framenavigated" fires ~50ms after the load event, wiping any earlier addInitScript-injected
+    // DOM/state) - but NOT on any later client-side nav-link transition, so injecting once here,
+    // after that settles (this test has already waited out a full login+redirect network
+    // round-trip, well past that ~50ms window), survives for the rest of the session.
+    await page.addStyleTag({
+      content: ".chatbot_container.open, .chatbot_container.open * { pointer-events: none !important; }",
+    });
+
     // Every other file's beforeAll (support/sharedPage.js) loads this to start pre-authenticated.
     await page.context().storageState({ path: AUTH_FILE });
   });

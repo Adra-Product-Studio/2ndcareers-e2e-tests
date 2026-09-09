@@ -1,7 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
 const { waitForApiData } = require("../../../support/apiEnvelope");
-const { dismissChatbotIfOpen } = require("../../../support/chatbot");
 
 /**
  * /professional/jobs/all_jobs and its 3 tabs. All 4 tabs share the same header/tab-bar; each
@@ -204,7 +203,6 @@ class ProfessionalAllJobsPage {
    * (services/professional/index.js mellie_search_function("apply_filter") -> POST
    * /admin_jobs_meilisearch), confirmed live, even with no filters chosen. */
   async checkFilterPanel() {
-    await dismissChatbotIfOpen(this.page);
     await this.filterButton.click();
     await expect(this.filterPanelHeading).toBeVisible();
     await expect(this.page.getByRole("heading", { name: "Industry" })).toBeVisible();
@@ -227,7 +225,6 @@ class ProfessionalAllJobsPage {
    * "clear" state, same as searchFor() uses.
    */
   async applyFilterAndSearch(searchQuery) {
-    await dismissChatbotIfOpen(this.page);
     const initialCount = await this._resultsTotal();
 
     await this.filterButton.click();
