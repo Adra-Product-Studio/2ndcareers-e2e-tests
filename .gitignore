@@ -3,6 +3,7 @@ test-results/
 playwright-report/
 playwright-report.pdf
 *.pdf
-.env.test
+.env*
+!.env.test.example
 .playwright-mcp/
 .auth/

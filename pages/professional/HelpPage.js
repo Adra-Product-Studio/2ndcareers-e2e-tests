@@ -12,8 +12,10 @@ class ProfessionalHelpPage {
     this.videoIframes = page.locator("iframe");
   }
 
-  async goto() {
-    await this.page.goto("/professional/help");
+  /** Pass `action` (e.g. clicking "Help" in the header's profile dropdown) to trigger the
+   * navigation that loads this page instead of a fresh page.goto(). */
+  async goto(action = () => this.page.goto("/professional/help")) {
+    await action();
     await expect(this.heading).toBeVisible();
   }
 

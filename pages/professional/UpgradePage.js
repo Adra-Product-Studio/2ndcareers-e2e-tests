@@ -15,8 +15,10 @@ class ProfessionalUpgradePage {
     this.comingSoonButtons = page.getByRole("button", { name: "Coming Soon" });
   }
 
-  async goto() {
-    await this.page.goto("/professional/upgrade");
+  /** Pass `action` (e.g. clicking "Upgrade" in the header's profile dropdown) to trigger the
+   * navigation that loads this page instead of a fresh page.goto(). */
+  async goto(action = () => this.page.goto("/professional/upgrade")) {
+    await action();
     await expect(this.heading).toBeVisible();
   }
 

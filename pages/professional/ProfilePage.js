@@ -19,10 +19,10 @@ class ProfessionalProfilePage {
     this.skillsHeading = page.getByRole("heading", { name: "Skills", exact: true });
   }
 
-  async gotoAndLoad() {
-    const data = await waitForApiData(this.page, /\/professional_profile_dashboard/, () =>
-      this.page.goto("/professional/profile")
-    );
+  /** Pass `action` (e.g. clicking "My Profile" in the header's profile dropdown) to trigger
+   * the navigation that loads this page instead of a fresh page.goto(). */
+  async waitForLoad(action = () => this.page.goto("/professional/profile")) {
+    const data = await waitForApiData(this.page, /\/professional_profile_dashboard/, action);
 
     expect(data).toHaveProperty("email_id");
     expect(data.email_id).toContain("@");

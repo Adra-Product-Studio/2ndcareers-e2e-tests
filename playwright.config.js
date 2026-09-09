@@ -49,6 +49,10 @@ module.exports = defineConfig({
   reporter: [
     ["list"],
     ["html", { outputFolder: "playwright-report", open: OPEN_REPORT ? "always" : "never" }],
+    // Playwright's own GitHub Actions reporter - groups each spec file as a collapsible
+    // section in the run log and adds inline annotations on failures (file/line + error),
+    // instead of a flat wall of "list" output. Only active in CI; local runs are unaffected.
+    ...(process.env.CI ? [["github"]] : []),
   ],
   use: {
     baseURL: BASE_URL,

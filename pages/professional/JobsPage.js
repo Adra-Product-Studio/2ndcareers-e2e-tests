@@ -9,6 +9,8 @@ const { waitForApiData } = require("../../support/apiEnvelope");
  *   Recommended   no call fires for this test account (0 matches) - handled as a valid empty state
  *   Applied       POST /professional_applied_jobs  (data: {} when there are none)
  *   Saved         POST /professional_saved_jobs    (data: {} when there are none)
+ * Tabs and job cards are real <a>/clickable elements - clicked directly rather than navigated to
+ * via page.goto(), so these stay real Next.js client-side transitions, not full reloads.
  * Clicking a job card opens a detail pane in the same page (URL gains an encrypted slug) backed
  * by POST /selected_job_details (data: [{job_id, job_title, applied_status, saved_status, ...}]).
  */
@@ -33,10 +35,10 @@ class ProfessionalJobsPage {
     await expect(this.allJobsTab).toBeVisible();
   }
 
-  async gotoAndLoad() {
-    const data = await waitForApiData(this.page, /\/professional_dashboard/, () =>
-      this.page.goto("/professional/jobs/all_jobs")
-    );
+  /** Pass `action` (e.g. clicking the "Jobs" nav link) to trigger the navigation that loads
+   * this page instead of a fresh page.goto(). */
+  async waitForLoad(action = () => this.page.goto("/professional/jobs/all_jobs")) {
+    const data = await waitForApiData(this.page, /\/professional_dashboard/, action);
 
     expect(typeof data.total_count).toBe("number");
     expect(Array.isArray(data.job_details)).toBe(true);
@@ -69,24 +71,20 @@ class ProfessionalJobsPage {
   }
 
   /** This test account has 0 AI-matched jobs, so no listing endpoint call fires at all here. */
-  async gotoRecommendedTab() {
-    await this.page.goto("/professional/jobs/recommended_jobs");
-    await expect(this.recommendedTab).toBeVisible();
+  async goToRecommendedTab() {
+    await this.recommendedTab.click();
+    await this.page.waitForURL(/\/recommended_jobs/);
     await expect(this.page.getByText(/Showing \d+ Jobs?/)).toBeVisible();
   }
 
-  async gotoAppliedTab() {
-    const data = await waitForApiData(this.page, /\/professional_applied_jobs/, () =>
-      this.page.goto("/professional/jobs/applied_jobs")
-    );
+  async goToAppliedTab() {
+    const data = await waitForApiData(this.page, /\/professional_applied_jobs/, () => this.appliedTab.click());
     this._checkTabListing(data);
     return data;
   }
 
-  async gotoSavedTab() {
-    const data = await waitForApiData(this.page, /\/professional_saved_jobs/, () =>
-      this.page.goto("/professional/jobs/saved_jobs")
-    );
+  async goToSavedTab() {
+    const data = await waitForApiData(this.page, /\/professional_saved_jobs/, () => this.savedTab.click());
     this._checkTabListing(data);
     return data;
   }

@@ -23,10 +23,12 @@ class LoginPage {
   }
 
   async fillCredentials({ email = "", password = "" } = {}) {
+    // pressSequentially, not fill() - types one character at a time (like a real person) so
+    // this is actually watchable in the recorded video, instead of the value just appearing.
     await this.emailInput.fill("");
-    if (email) await this.emailInput.fill(email);
+    if (email) await this.emailInput.pressSequentially(email, { delay: 60 });
     await this.passwordInput.fill("");
-    if (password) await this.passwordInput.fill(password);
+    if (password) await this.passwordInput.pressSequentially(password, { delay: 60 });
   }
 
   async submit() {

@@ -28,9 +28,10 @@ class LearningEventFlow {
     this.confirmButton = page.getByRole("button", { name: /Confirm/i });
   }
 
-  /** From /professional/learning, opens the first listed event's detail page. */
-  async openFirstListingDetails() {
-    await this.page.goto("/professional/learning");
+  /** Opens the first listed event's detail page - call while already on /professional/learning
+   * (pass `beforeClick` if you need to navigate there first; defaults to a fresh page.goto()). */
+  async openFirstListingDetails(beforeClick = () => this.page.goto("/professional/learning")) {
+    await beforeClick();
     const data = await waitForApiData(this.page, /\/get_listing_view/, () =>
       this.detailsButtons.first().click()
     );

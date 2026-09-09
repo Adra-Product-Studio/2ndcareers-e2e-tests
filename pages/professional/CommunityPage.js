@@ -12,10 +12,10 @@ class ProfessionalCommunityPage {
     this.joinConversationButton = page.getByRole("button", { name: "Join the Conversation" });
   }
 
-  async gotoAndLoad() {
-    const data = await waitForApiData(this.page, /\/professional_discourse_community/, () =>
-      this.page.goto("/professional/community")
-    );
+  /** Pass `action` (e.g. clicking the home dashboard's COMMUNITY card) to trigger the
+   * navigation that loads this page instead of a fresh page.goto(). */
+  async waitForLoad(action = () => this.page.goto("/professional/community")) {
+    const data = await waitForApiData(this.page, /\/professional_discourse_community/, action);
 
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThan(0);
