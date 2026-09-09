@@ -1,18 +1,19 @@
 {
   "name": "2ndcareers-e2e-tests",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Cypress end-to-end automation suite for the 2nd Careers frontend, consumed as a git submodule.",
+  "description": "Playwright end-to-end automation suite for the 2nd Careers frontend, consumed as a git submodule.",
   "scripts": {
-    "start-app": "npm --prefix .. run local",
-    "cy:open": "cypress open",
-    "cy:run": "cypress run --browser chrome",
-    "cy:run:headed": "cypress run --browser chrome --headed --no-exit",
-    "test": "node scripts/with-app.js cy:run",
-    "test:open": "node scripts/with-app.js cy:open",
-    "test:headed": "node scripts/with-app.js cy:run:headed"
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:ui": "playwright test --project=chromium --ui",
+    "test:e2e:headed": "cross-env PW_SLOWMO=500 PW_MAXIMIZE=true playwright test --project=chromium --headed --workers=1",
+    "test:e2e:debug": "playwright test --project=chromium --debug",
+    "test:e2e:chrome": "cross-env PW_SLOWMO=500 PW_MAXIMIZE=true PW_OPEN_REPORT=true playwright test --project=chrome --headed --workers=1",
+    "test:e2e:report": "playwright show-report",
+    "report:pdf": "node scripts/report-to-pdf.js"
   },
   "devDependencies": {
-    "cypress": "^14.0.0"
+    "@playwright/test": "1.62.1",
+    "cross-env": "^10.1.0"
   }
 }
