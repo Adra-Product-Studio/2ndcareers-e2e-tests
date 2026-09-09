@@ -22,8 +22,12 @@ class ProfessionalRecommendedJobsPage {
     this.recommendedTab = page.getByRole("link", { name: "Recommended" });
     this.searchInput = page.getByPlaceholder("Search by job title, description, company name, skills");
     this.resultsCount = page.getByText(/Showing \d+ Jobs?/);
-    this.completeProfilePrompt = page.getByText(/complete your profile to increase your chances/);
-    this.completeProfileLink = page.getByRole("link", { name: "My Profile" });
+    // .and(":visible") - confirmed on CI/staging this text renders as many duplicate elements (a
+    // double-digit count, growing across runs - not just a fixed handful of responsive
+    // breakpoint copies), almost all hidden; DOM order (.first()) doesn't reliably land on the
+    // one actually shown, so this intersects the text match with actual visibility instead.
+    this.completeProfilePrompt = page.getByText(/complete your profile to increase your chances/).and(page.locator(":visible"));
+    this.completeProfileLink = page.getByRole("link", { name: "My Profile" }).and(page.locator(":visible"));
   }
 
   async goto() {
@@ -43,9 +47,8 @@ class ProfessionalRecommendedJobsPage {
   async waitForLoadBelowThreshold(action = () => this.goto()) {
     await action();
     await expect(this.resultsCount).toHaveText("Showing 0 Jobs");
-    // .first() - confirmed on CI/staging this text renders as multiple duplicate elements (a
-    // responsive mobile/desktop markup duplication, same class of issue as the header's hidden
-    // off-canvas nav), which a plain toBeVisible() treats as a strict-mode violation.
+    // .first() on top of the constructor's :visible filter, in case more than one copy is
+    // simultaneously visible for any reason - belt and braces against a strict-mode violation.
     await expect(this.completeProfilePrompt.first()).toBeVisible();
     await expect(this.completeProfileLink.first()).toHaveAttribute("href", "/professional/profile");
   }
