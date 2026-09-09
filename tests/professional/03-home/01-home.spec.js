@@ -18,17 +18,22 @@ const { hasCredentials } = credentialsFor("professional");
  *     53% is above that, so the carousel (Latest/Featured Jobs) is the branch actually covered.
  * Testing the <=30% and >=60% buckets would need a second account seeded at those percentages -
  * out of scope for this single shared account.
+ *
+ * The raw JSON envelope for Home's own data (including the exact profile_percentage) is already
+ * captured and verified once, in 01-login.spec.js - that post-login redirect is the one moment
+ * Home mounts genuinely fresh this session, and 02-navigation.spec.js deliberately leaves the
+ * session sitting right there without navigating anywhere else (see its own doc comment) - so
+ * this file just checks the UI that's already rendered, rather than re-navigating (which,
+ * confirmed live, Next.js's client router cache can serve from cache with no new matching network
+ * call at all - see HomePage.checkAlreadyLoaded).
  */
 test.describe("Professional - Home", () => {
-  const session = useSharedPage(test, { videoName: "03-home" });
+  const session = useSharedPage(test);
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
 
-  test("loads with the expected data and every card", async () => {
+  test("shows every card", async () => {
     const home = new ProfessionalHomePage(session.page);
-    const { home: data } = await home.waitForLoad();
-    expect(data.profile_percentage).toBeGreaterThan(30);
-    expect(data.profile_percentage).toBeLessThan(60);
-    await home.checkCards();
+    await home.checkAlreadyLoaded();
   });
 
   test("Notification bell opens and closes the notifications panel", async () => {

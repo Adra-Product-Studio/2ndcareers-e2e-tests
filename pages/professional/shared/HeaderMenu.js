@@ -1,6 +1,7 @@
 // @ts-check
 const { expect } = require("@playwright/test");
 const { waitForApiData } = require("../../../support/apiEnvelope");
+const { dismissChatbotIfOpen } = require("../../../support/chatbot");
 
 /**
  * The professional section's shared header, present with the same structure on every
@@ -39,21 +40,25 @@ class HeaderMenu {
   }
 
   async goToHome() {
+    await dismissChatbotIfOpen(this.page);
     await this.homeNavLink.click();
     await this.page.waitForURL(/\/professional\/home/);
   }
 
   async goToJobs() {
+    await dismissChatbotIfOpen(this.page);
     await this.jobsNavLink.click();
     await this.page.waitForURL(/\/professional\/jobs/);
   }
 
   async goToLearning() {
+    await dismissChatbotIfOpen(this.page);
     await this.learningNavLink.click();
     await this.page.waitForURL(/\/professional\/learning$/);
   }
 
   async goToAgents() {
+    await dismissChatbotIfOpen(this.page);
     await this.agentsNavLink.click();
     await this.page.waitForURL(/\/professional\/2c_agent$/);
   }
@@ -85,6 +90,7 @@ class HeaderMenu {
   /** Idempotent - the profile button toggles the dropdown (verified live), so this only clicks
    * it when the dropdown isn't already open, otherwise a second call would close it again. */
   async openProfileMenu() {
+    await dismissChatbotIfOpen(this.page);
     const alreadyOpen = await this.myProfileLink.isVisible().catch(() => false);
     if (!alreadyOpen) {
       await this.profileMenuButton.click();

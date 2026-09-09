@@ -7,12 +7,14 @@ const { credentialsFor } = require("../../../fixtures/credentials");
 const { hasCredentials } = credentialsFor("professional");
 
 test.describe("Professional - Jobs - Applied", () => {
-  const session = useSharedPage(test, { videoName: "04-jobs-03-applied" });
+  const session = useSharedPage(test);
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
 
   test("loads the empty state (this account never actually submits an application - see AllJobsPage)", async () => {
     const applied = new ProfessionalAppliedJobsPage(session.page);
-    const jobs = await applied.waitForLoad();
+    // 02-recommended-jobs.spec.js left the session on the Recommended tab - arrive here via a
+    // real click on the Applied tab rather than a fresh page.goto().
+    const jobs = await applied.waitForLoad(() => applied.appliedTab.click());
     expect(jobs.length).toBe(0);
     await applied.checkEmptyState();
   });

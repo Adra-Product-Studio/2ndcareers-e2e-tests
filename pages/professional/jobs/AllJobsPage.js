@@ -1,6 +1,7 @@
 // @ts-check
 const { expect } = require("@playwright/test");
 const { waitForApiData } = require("../../../support/apiEnvelope");
+const { dismissChatbotIfOpen } = require("../../../support/chatbot");
 
 /**
  * /professional/jobs/all_jobs and its 3 tabs. All 4 tabs share the same header/tab-bar; each
@@ -26,15 +27,38 @@ class ProfessionalAllJobsPage {
     // the search trigger when idle and the "clear search" (x) trigger once a search is active,
     // mutually exclusive, so a class locator is unambiguous either way.
     this.searchIcon = page.locator(".search_end_icon");
-    this.filterButton = page.getByRole("button", { name: "Filter" });
+    // A stable CSS class, not getByRole("button", {name: "Filter"}) - confirmed live, this
+    // button's own accessible name becomes "Filter 1" (with a count badge) once a filter is
+    // active, and by then "Apply Filter"/"Clear Filter" (also role=button, name containing
+    // "Filter") are mounted in the same drawer - a name-substring match risks a strict-mode
+    // violation right when this suite needs to reopen the panel to clear it.
+    this.filterButton = page.locator(".search_filter_button");
     this.filterPanelHeading = page.getByRole("heading", { name: "Filter", exact: true });
     this.applyFilterButton = page.getByRole("button", { name: "Apply Filter" });
+    // Only renders once a filter/search has actually been applied (confirmed live) - resets the
+    // Job Type/Industry/etc. selections back to none, but NOT any active text search (that's the
+    // search icon's own "clear" state, see searchIcon above) - clearing "all search and filter"
+    // needs both.
+    this.clearFilterButton = page.getByRole("button", { name: "Clear Filter" });
+    // A fully custom, non-ARIA dropdown (components/Inputs/ReactDropdownSelect.jsx via
+    // json/json_data/filters/index.js) - plain onClick divs, no role="combobox"/"option" to hook
+    // into, confirmed live. ".custom-dropdown-item" is the one stable hook the real DOM offers.
+    this.jobTypeDropdownTrigger = page.getByText("Select job type");
+    this.jobTypeOptions = page.locator(".custom-dropdown-item");
+    // react-paginate's rendered <a role="button">, confirmed live - "Page N" for any other page,
+    // "Page N is your current page" for the active one (excluded by this exact-count match), and
+    // "Jump forward"/"Jump backward" for the "..." ellipsis buttons (also excluded).
+    this.paginationPageButtons = page.getByRole("button", { name: /^Page \d+$/ });
     this.jobCards = page.locator("main").getByRole("heading", { level: 6 });
     this.applyNowButton = page.getByRole("button", { name: "Apply Now" });
     this.saveJobButton = page.getByRole("button", { name: "Save", exact: true });
     this.savedJobButton = page.getByRole("button", { name: "Saved", exact: true });
     this.removeJobButton = page.getByRole("button", { name: "Remove" });
-    this.resultsCount = page.getByText(/Showing \d+ - \d+ of \d+ Jobs/);
+    // A filter+search combination can legitimately intersect to zero results (confirmed live,
+    // e.g. one Job Type + an unrelated search term) - the count text then switches from
+    // "Showing X - Y of Z Jobs" to a plain "Showing 0 Jobs" with no "of" clause at all, so this
+    // matches either form rather than assuming pagination-style text is always present.
+    this.resultsCount = page.getByText(/Showing (\d+ - \d+ of \d+|0) Jobs/);
     this.jobDescriptionHeading = page.getByRole("heading", { name: "Job Description" });
     this.applyForJobModalHeading = page.getByRole("heading", { name: "Apply for job" });
     this.completeProfileLink = page.getByRole("link", { name: "My Profile." });
@@ -166,7 +190,10 @@ class ProfessionalAllJobsPage {
 
   async _resultsTotal() {
     const text = (await this.resultsCount.textContent()) || "";
-    const match = text.match(/of (\d+) Jobs/);
+    // "Showing X - Y of Z Jobs" when there are results, or a plain "Showing 0 Jobs" (no "of"
+    // clause at all) when a filter+search combination legitimately has zero matches - see
+    // resultsCount's own constructor comment.
+    const match = text.match(/of (\d+) Jobs/) || text.match(/Showing (\d+) Jobs/);
     expect(match, `couldn't parse a job count out of "${text}"`).toBeTruthy();
     return Number(match[1]);
   }
@@ -177,6 +204,7 @@ class ProfessionalAllJobsPage {
    * (services/professional/index.js mellie_search_function("apply_filter") -> POST
    * /admin_jobs_meilisearch), confirmed live, even with no filters chosen. */
   async checkFilterPanel() {
+    await dismissChatbotIfOpen(this.page);
     await this.filterButton.click();
     await expect(this.filterPanelHeading).toBeVisible();
     await expect(this.page.getByRole("heading", { name: "Industry" })).toBeVisible();
@@ -190,17 +218,74 @@ class ProfessionalAllJobsPage {
   }
 
   /**
+   * The real, combined flow a person would actually do: pick a Job Type filter, apply it, then
+   * layer a text search on top - both go through the same POST /admin_jobs_meilisearch (see
+   * checkFilterPanel/searchFor above) - verify the result count actually changes at each step,
+   * then clear BOTH back to the original unfiltered list. Confirmed live: "Clear Filter" (only
+   * rendered once a filter/search has been applied) resets the Job Type selection alone, NOT the
+   * search text - restoring "all search and filter" needs a second click on the search icon's own
+   * "clear" state, same as searchFor() uses.
+   */
+  async applyFilterAndSearch(searchQuery) {
+    await dismissChatbotIfOpen(this.page);
+    const initialCount = await this._resultsTotal();
+
+    await this.filterButton.click();
+    await expect(this.filterPanelHeading).toBeVisible();
+    await this.jobTypeDropdownTrigger.click();
+    const firstJobType = this.jobTypeOptions.first();
+    await expect(firstJobType).toBeVisible();
+    const jobTypeLabel = ((await firstJobType.textContent()) || "").trim();
+    await waitForApiData(this.page, /\/admin_jobs_meilisearch/, async () => {
+      await firstJobType.click();
+      await this.applyFilterButton.click();
+    });
+    await expect(this.filterPanelHeading).toBeHidden();
+    const filteredByTypeCount = await this._resultsTotal();
+
+    await waitForApiData(this.page, /\/admin_jobs_meilisearch/, async () => {
+      await this.searchInput.pressSequentially(searchQuery, { delay: 90 });
+      await this.searchInput.press("Enter");
+    });
+    const filteredAndSearchedCount = await this._resultsTotal();
+
+    await this.filterButton.click();
+    await expect(this.clearFilterButton).toBeVisible();
+    await waitForApiData(this.page, /\/admin_jobs_meilisearch/, () => this.clearFilterButton.click());
+    await waitForApiData(this.page, /\/professional_dashboard/, () => this.searchIcon.click());
+    const restoredCount = await this._resultsTotal();
+
+    return { initialCount, jobTypeLabel, filteredByTypeCount, filteredAndSearchedCount, restoredCount };
+  }
+
+  /** Clicks a random (non-current) pagination page number - react-paginate's rendered <a
+   * role="button">, see paginationPageButtons above. Returns null if there's only one page of
+   * results (nothing to paginate to), otherwise the page number landed on. */
+  async goToRandomPage() {
+    const count = await this.paginationPageButtons.count();
+    if (count === 0) return null;
+
+    const choice = this.paginationPageButtons.nth(Math.floor(Math.random() * count));
+    const label = (await choice.textContent()) || "";
+    await waitForApiData(this.page, /\/professional_dashboard|\/admin_jobs_meilisearch/, () => choice.click());
+    return label.trim();
+  }
+
+  /**
    * Saving a job is real, persistent account state (confirmed live: the "Save" button becomes
    * a disabled "Saved" status, not a toggle - unsaving only works from the Saved tab's "Remove"
    * button, which is a distinct endpoint - POST /unsave_job - from the one Save itself uses).
-   * This exercises the full cycle and restores the account to its original state (nothing saved)
-   * before returning, so it's safe to run on every CI push. Call with a job's detail pane already
-   * open (e.g. right after openFirstJobDetail()).
+   * Call with a job's detail pane already open (e.g. right after openFirstJobDetail()).
    */
-  async saveThenRemoveJob(jobTitle) {
+  async saveCurrentJob() {
     await waitForApiData(this.page, /\/professional_job_save/, () => this.saveJobButton.click());
     await expect(this.savedJobButton).toBeVisible();
+  }
 
+  /** Confirms `jobTitle` (just saved via saveCurrentJob()) shows up on the Saved tab, removes it,
+   * then returns to the All Jobs tab - restoring the account to its original state (nothing
+   * saved) via real tab clicks, no reload, so this is safe to run on every CI push. */
+  async verifyAndRemoveSavedJob(jobTitle) {
     const savedJobs = await this.goToSavedTab();
     expect(savedJobs.some((job) => job.job_title === jobTitle)).toBe(true);
 

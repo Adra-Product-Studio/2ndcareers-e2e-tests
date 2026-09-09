@@ -29,8 +29,10 @@ class ProfessionalCareerCopilotsPage {
     this.jobCountText = page.getByText(/\d+ Jobs?/);
   }
 
-  async goto() {
-    await this.page.goto("/professional/2c_agent/career_copilots");
+  /** Pass `action` (e.g. clicking the Agents hub's "Get Started" link) to trigger the navigation
+   * that loads this page instead of a fresh page.goto(). */
+  async goto(action = () => this.page.goto("/professional/2c_agent/career_copilots")) {
+    await action();
     await expect(this.naviHeading).toBeVisible();
   }
 

@@ -38,23 +38,28 @@ class ProfessionalExternalEventPage {
 
   /**
    * Call after goto(). Tries up to `maxAttempts` visible "Details" cards, clicking each and
-   * checking the resulting URL, reloading fresh to try the next one on a miss (an internal
-   * event). Returns `true` if an external event's details opened, `false` if none of the first
-   * `maxAttempts` cards were external - a real, data-dependent "none available right now" outcome
-   * rather than a selector bug, since the caller decides how to treat it (this suite skips the
-   * test rather than failing it): Connect with Experts/Learn Live only show a 3-item PREVIEW
-   * before "See all" is clicked (confirmed live, matching MarketplacePage's documented >3 "See
-   * all" visibility rule), so the pool actually reachable here is Featured Listings (1) + both
-   * previews (3+3) = 7 cards, not the full 139/9-listing count - reaching into the full "See all"
-   * listing (a materially different page layout) is out of scope for this check.
+   * checking the resulting URL. Returns `true` if an external event's details opened, `false` if
+   * none of the first `maxAttempts` cards were external - a real, data-dependent "none available
+   * right now" outcome rather than a selector bug, since the caller decides how to treat it (this
+   * suite skips the test rather than failing it): Connect with Experts/Learn Live only show a
+   * 3-item PREVIEW before "See all" is clicked (confirmed live, matching MarketplacePage's
+   * documented >3 "See all" visibility rule), so the pool actually reachable here is Featured
+   * Listings (1) + both previews (3+3) = 7 cards, not the full 139/9-listing count - reaching into
+   * the full "See all" listing (a materially different page layout) is out of scope for this check.
    *
    * The listing cards themselves are lazy-mounted on scroll (same pattern as the On Demand/
    * Resources/Perspectives sections further down this page - confirmed live: right after load,
    * only the section headings exist, zero "Details" buttons anywhere) - scrolling each section
-   * title into view first is what actually mounts its cards. Reloading (not page.goBack()) between
-   * attempts: goBack() was observed live to hang unpredictably (whether it refetches
-   * get_marketplace/get_training_data or restores them from Next.js's router cache varies) - a
-   * fresh goto() re-runs the one path already proven fast and reliable.
+   * title into view first is what actually mounts its cards.
+   *
+   * A miss lands on an INTERNAL event's own detail page instead (a different route from this
+   * external one) - that page always has its own "Back to Learnings" button (see
+   * InternalEventFlow.js), a real in-app link back to the marketplace root. Clicking it re-runs
+   * the same dual-API load goto() uses, but as a normal SPA transition (a brief loading state on
+   * the same page) rather than a full page.goto() reload - no page.goBack() needed (confirmed live
+   * it's unreliable here: whether it refetches get_marketplace/get_training_data or restores them
+   * from Next.js's router cache varies, and either way it was observed hanging well past a
+   * minute), and no reload flash between attempts either.
    */
   async openFirstExternalEventDetails(maxAttempts = 12) {
     await this._scrollListingSectionsIntoView();
@@ -62,11 +67,9 @@ class ProfessionalExternalEventPage {
     for (let i = 0; i < total; i++) {
       await this.detailsButtons.nth(i).click();
       if (/\/learning\/external_event\?evt=/.test(this.page.url())) return true;
-      // Not page.goBack() - confirmed live it's unreliable here (whether it refetches the two
-      // listing sources or restores them from Next.js's router cache varies, and either way it
-      // was observed hanging well past a minute). A fresh goto() re-runs the one path already
-      // proven reliable (dual-API-wait, confirmed fast in isolation).
-      await this.goto();
+      await waitForApiDataMulti(this.page, [/\/get_training_data/, /\/get_marketplace/], () =>
+        this.page.getByRole("button", { name: "Back to Learnings" }).click()
+      );
       await this._scrollListingSectionsIntoView();
     }
     return false;

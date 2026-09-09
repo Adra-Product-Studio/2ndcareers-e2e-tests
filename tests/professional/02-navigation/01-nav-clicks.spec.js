@@ -1,68 +1,35 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
 const { useSharedPage } = require("../../../support/sharedPage");
-const { LoginPage } = require("../../../pages/LoginPage");
 const { HeaderMenu } = require("../../../pages/professional/shared/HeaderMenu");
 const { credentialsFor } = require("../../../fixtures/credentials");
 
 const { hasCredentials } = credentialsFor("professional");
 
 /**
- * Every other file in this suite reaches its own page directly (page.goto()) so each is
- * independently runnable - see e2e-tests/README.md for why the suite is organized page-by-page.
- * This file is the one place that still walks between top-level sections via real nav-link
- * clicks, proving the header survives client-side transitions without a full reload (verified
- * live: a value stashed on `window` before a nav-link click was still there afterward) rather
- * than every test re-proving that same fact.
+ * Checks the profile dropdown's own links WITHOUT navigating anywhere - unlike an earlier version
+ * of this file, this deliberately does NOT click through Home -> Jobs -> Learning -> Agents (or
+ * sign out) as a "does nav work at all" sanity check before the real per-page chapters run.
+ * Confirmed live: Next.js's client router cache can serve an already-visited route with NO new
+ * matching network request at all (the UI still renders correctly - it's just served from cache),
+ * so a page visited here first would silently break every later chapter's own fresh-data check
+ * when it tries to arrive at that SAME page via its own nav-link click (04-jobs, 05-learning,
+ * 06-agents all rely on their click being that page's very first visit this session). Each
+ * chapter's own real click-based entry already proves nav-link transitions work (no full reload,
+ * real data fetched) - a separate up-front pass isn't needed and actively causes that bug, so it
+ * doesn't touch Home/Jobs/Learning/Agents at all. Sign out is the very last thing the whole suite
+ * does, in 11-upgrade.spec.js.
  */
 test.describe("Professional - top-level navigation via header links", () => {
-  const session = useSharedPage(test, { videoName: "02-navigation" });
+  const session = useSharedPage(test);
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
 
-  test("Home -> Jobs -> Learning -> 2C Agents -> Home, via nav links", async () => {
-    const page = session.page;
-    const header = new HeaderMenu(page);
-
-    await page.goto("/professional/home");
-    await expect(page).toHaveURL(/\/professional\/home/);
-
-    await header.goToJobs();
-    await expect(page).toHaveURL(/\/professional\/jobs/);
-
-    await header.goToLearning();
-    await expect(page).toHaveURL(/\/professional\/learning$/);
-
-    await header.goToAgents();
-    await expect(page).toHaveURL(/\/professional\/2c_agent$/);
-
-    await header.goToHome();
-    await expect(page).toHaveURL(/\/professional\/home/);
-  });
-
-  test("Profile dropdown -> My Profile / Upgrade / Help, via real clicks", async () => {
-    const page = session.page;
-    const header = new HeaderMenu(page);
-
-    await page.goto("/professional/home");
+  test("profile dropdown lists My Profile / Upgrade / Help / Get Support / Sign out, without navigating away yet", async () => {
+    const header = new HeaderMenu(session.page);
     await header.checkProfileMenuLinks();
-
-    await header.goToProfileMenuLink("My Profile");
-    await expect(page).toHaveURL(/\/professional\/profile/);
-
-    await header.goToProfileMenuLink("Upgrade");
-    await expect(page).toHaveURL(/\/professional\/upgrade/);
-
-    await header.goToProfileMenuLink("Help");
-    await expect(page).toHaveURL(/\/professional\/help/);
-  });
-
-  test("Sign out from the profile menu, back to the login page", async () => {
-    const page = session.page;
-    const header = new HeaderMenu(page);
-    await header.signOut();
-
-    const loginPage = new LoginPage(page);
-    await expect(loginPage.heading).toBeVisible();
-    await expect(page).toHaveURL(/\/$/);
+    // The same button toggles the dropdown open/closed (see HeaderMenu.js) - close it back down
+    // rather than leaving it open, so the next chapter (03-home) starts from a plain page.
+    await header.profileMenuButton.click();
+    await expect(header.myProfileLink).toBeHidden();
   });
 });

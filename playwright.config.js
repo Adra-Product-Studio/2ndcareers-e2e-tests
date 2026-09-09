@@ -45,7 +45,13 @@ module.exports = defineConfig({
   // workers or fullyParallel would run files out of order or concurrently and break that.
   fullyParallel: false,
   workers: 1,
-  retries: process.env.CI ? 1 : 0,
+  // Always 0, even in CI: the whole numbered suite now shares ONE continuous browser
+  // context/page/video (see support/sharedPage.js) so moving "to another page" is a real
+  // nav-link/tab click instead of a fresh page.goto() between files. A retry re-runs only the
+  // failing file in a new worker, which can't reconstruct the exact page state the files before
+  // it left behind (which tab/section/modal was open) - so a mid-suite retry would just fail
+  // again for the wrong reason. A real, un-retried failure surfaces clearly instead.
+  retries: 0,
   reporter: [
     ["list"],
     ["html", { outputFolder: "playwright-report", open: OPEN_REPORT ? "always" : "never" }],

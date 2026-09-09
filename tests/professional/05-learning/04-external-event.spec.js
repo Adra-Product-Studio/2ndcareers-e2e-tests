@@ -2,6 +2,7 @@
 const { test } = require("@playwright/test");
 const { useSharedPage } = require("../../../support/sharedPage");
 const { ProfessionalExternalEventPage } = require("../../../pages/professional/learning/ExternalEventPage");
+const { HeaderMenu } = require("../../../pages/professional/shared/HeaderMenu");
 const { credentialsFor } = require("../../../fixtures/credentials");
 
 const { hasCredentials } = credentialsFor("professional");
@@ -14,7 +15,7 @@ const { hasCredentials } = credentialsFor("professional");
  * Razorpay/Stripe and is left untouched, same as the internal event flow.
  */
 test.describe("Professional - Learning - external event detail", () => {
-  const session = useSharedPage(test, { videoName: "05-learning-04-external-event" });
+  const session = useSharedPage(test);
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
 
   // Shared with the second test below - both need to skip together when no external event is
@@ -26,7 +27,10 @@ test.describe("Professional - Learning - external event detail", () => {
     // waiting out the marketplace's own loading-skeleton race - more headroom than the default.
     test.setTimeout(150_000);
     const external = new ProfessionalExternalEventPage(session.page);
-    await external.goto();
+    const header = new HeaderMenu(session.page);
+    // 03-internal-event.spec.js left the session deep on the Book & Pay page - arrive back at
+    // the marketplace via the real Learning nav-link click rather than a fresh page.goto().
+    await external.goto(() => header.goToLearning());
     foundExternalEvent = await external.openFirstExternalEventDetails();
     // Only the first ~7 preview cards are checked (see ExternalEventPage.js) - none being
     // external right now is a real, data-dependent state, not a bug, so this skips rather than

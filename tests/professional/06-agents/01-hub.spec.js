@@ -2,17 +2,21 @@
 const { test, expect } = require("@playwright/test");
 const { useSharedPage } = require("../../../support/sharedPage");
 const { ProfessionalAgentsHubPage } = require("../../../pages/professional/agents/AgentsHubPage");
+const { HeaderMenu } = require("../../../pages/professional/shared/HeaderMenu");
 const { credentialsFor } = require("../../../fixtures/credentials");
 
 const { hasCredentials } = credentialsFor("professional");
 
 test.describe("Professional - 2C Agents - hub", () => {
-  const session = useSharedPage(test, { videoName: "06-agents-01-hub" });
+  const session = useSharedPage(test);
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
 
   test("loads with both cards", async () => {
     const agents = new ProfessionalAgentsHubPage(session.page);
-    await agents.waitForLoad();
+    const header = new HeaderMenu(session.page);
+    // 05-learning left the session on an event's details page - arrive here via the real 2C
+    // Agents nav-link click rather than a fresh page.goto().
+    await agents.waitForLoad(() => header.goToAgents());
     await agents.checkCards();
   });
 

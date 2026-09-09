@@ -1,54 +1,35 @@
 // @ts-check
-// Merges the per-file .webm recordings (one per spec file - see support/sharedPage.js) into a
-// single video covering the whole run, in file order (each spec file's videoName is prefixed to
-// match its numbered test folder, e.g. 07-profile-03-experience, so alphabetical directory sort
-// reproduces the suite's real page-by-page order). Uses ffmpeg-static (a bundled binary) rather
-// than relying on the machine/CI runner already having ffmpeg installed, so this works the same
-// locally and in CI.
+// The whole numbered suite now shares ONE continuous browser context/page/video (see
+// support/sharedPage.js) instead of one .webm per spec file, so there's normally exactly one
+// recording to publish. This still tolerates more than one file turning up in that directory
+// (e.g. a locally re-run single spec during authoring) by picking the most recently modified one,
+// rather than concatenating - concatenating unrelated recordings from separate ad-hoc runs would
+// itself produce the kind of jump-cut "refresh" this whole restructure was meant to remove.
 const fs = require("fs");
 const path = require("path");
-const { execFileSync } = require("child_process");
-const ffmpegPath = require("ffmpeg-static");
 
-const VIDEOS_DIR = path.join(__dirname, "..", "test-results", "videos");
+const VIDEO_DIR = path.join(__dirname, "..", "test-results", "videos", "professional-suite");
 const OUTPUT_PATH = path.resolve(process.cwd(), process.argv[2] || "e2e-automation.webm");
 
 function main() {
-  if (!fs.existsSync(VIDEOS_DIR)) {
-    console.error(`No videos found at ${VIDEOS_DIR} - run the suite (with video recording) first.`);
+  if (!fs.existsSync(VIDEO_DIR)) {
+    console.error(`No video found at ${VIDEO_DIR} - run the suite (with video recording) first.`);
     process.exit(1);
   }
 
-  // Each subdirectory is one spec file's videoName (see support/sharedPage.js) - sorting them
-  // gives 01-login, 02-home, ... 09-logout, i.e. the right playback order.
-  const dirs = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
+  const webms = fs
+    .readdirSync(VIDEO_DIR)
+    .filter((f) => f.endsWith(".webm"))
+    .map((f) => path.join(VIDEO_DIR, f))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
 
-  const files = [];
-  for (const dir of dirs) {
-    const dirPath = path.join(VIDEOS_DIR, dir);
-    const webm = fs.readdirSync(dirPath).find((f) => f.endsWith(".webm"));
-    if (webm) files.push(path.join(dirPath, webm));
-  }
-
-  if (files.length === 0) {
-    console.error("No .webm files found under test-results/videos to merge.");
+  if (webms.length === 0) {
+    console.error(`No .webm files found under ${VIDEO_DIR}.`);
     process.exit(1);
   }
 
-  const listPath = path.join(VIDEOS_DIR, "concat-list.txt");
-  const listContent = files.map((f) => `file '${f.replace(/\\/g, "/").replace(/'/g, "'\\''")}'`).join("\n");
-  fs.writeFileSync(listPath, listContent);
-
-  execFileSync(
-    ffmpegPath,
-    ["-y", "-f", "concat", "-safe", "0", "-i", listPath, "-c", "copy", OUTPUT_PATH],
-    { stdio: "inherit" }
-  );
-
-  console.log(`Wrote ${OUTPUT_PATH} (merged ${files.length} recordings: ${dirs.join(", ")})`);
+  fs.copyFileSync(webms[0], OUTPUT_PATH);
+  console.log(`Wrote ${OUTPUT_PATH} (from ${webms[0]}${webms.length > 1 ? `; ignored ${webms.length - 1} older recording(s) in the same directory` : ""})`);
 }
 
 main();

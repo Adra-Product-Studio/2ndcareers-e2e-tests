@@ -1,7 +1,8 @@
 // @ts-check
-const { test } = require("@playwright/test");
+const { test, expect } = require("@playwright/test");
 const { useSharedPage } = require("../../../support/sharedPage");
 const { ProfessionalCareerCopilotsPage } = require("../../../pages/professional/agents/CareerCopilotsPage");
+const { ProfessionalAgentsHubPage } = require("../../../pages/professional/agents/AgentsHubPage");
 const { credentialsFor } = require("../../../fixtures/credentials");
 
 const { hasCredentials } = credentialsFor("professional");
@@ -12,12 +13,16 @@ const { hasCredentials } = credentialsFor("professional");
  * actual search is deliberately never submitted.
  */
 test.describe("Professional - 2C Agents - Career Copilots", () => {
-  const session = useSharedPage(test, { videoName: "06-agents-02-career-copilots" });
+  const session = useSharedPage(test);
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
 
   test("loads with the initial empty state", async () => {
     const copilots = new ProfessionalCareerCopilotsPage(session.page);
-    await copilots.goto();
+    const agentsHub = new ProfessionalAgentsHubPage(session.page);
+    // 01-hub.spec.js left the session on the 2C Agents hub - arrive here via the real "Get
+    // Started" link click (Job Scout's card) rather than a fresh page.goto().
+    await copilots.goto(() => agentsHub.jobScoutGetStartedLink.click());
+    await expect(session.page).toHaveURL(/\/career_copilots/);
     await copilots.checkInitialState();
   });
 

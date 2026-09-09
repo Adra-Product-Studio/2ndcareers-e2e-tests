@@ -20,21 +20,18 @@ class ProfessionalHomePage {
   }
 
   /**
-   * Validates the page's own API calls in one pass. With no `action` (a fresh page.goto()),
-   * this ALSO validates GET /user_dashboard_details - the header's user-info call, which only
-   * fires once per app session because the header lives in a persistent layout that doesn't
-   * remount on same-section client navigation (confirmed live). That makes a real page.goto()
-   * the only reliable place to catch it, so the very first Home visit of a journey is where
-   * it's checked; pass an `action` (e.g. a nav-link click) for a lighter, page-data-only check
-   * on later returns to Home.
+   * Validates every one of the page's own API calls in one pass, PLUS GET /user_dashboard_details
+   * (the header's user-info call) - only true the very first time Home mounts in a session
+   * (either a fresh page.goto(), or the redirect straight after login - see
+   * tests/professional/01-login/01-login.spec.js, which is where this is actually exercised).
+   * Confirmed live: returning to an already-visited route via a nav-link click later in the same
+   * session can be served entirely from Next.js's client router cache with NO new matching
+   * request at all, even though the page renders fully correct content - use checkAlreadyLoaded()
+   * for that case instead of this one.
    */
-  async waitForLoad(action) {
-    const patterns = action
-      ? [/\/professional_updated_home/, /\/professional_notifications/]
-      : [/\/professional_updated_home/, /\/professional_notifications/, /\/user_dashboard_details/];
-
-    const results = await waitForApiDataMulti(this.page, patterns, action || (() => this.page.goto("/professional/home")));
-    const [homeData, notifications, userDetails] = results;
+  async waitForLoad(action = () => this.page.goto("/professional/home")) {
+    const patterns = [/\/professional_updated_home/, /\/professional_notifications/, /\/user_dashboard_details/];
+    const [homeData, notifications, userDetails] = await waitForApiDataMulti(this.page, patterns, action);
 
     const home = Array.isArray(homeData) ? homeData[0] : homeData;
     expect(typeof home.user_name).toBe("string");
@@ -52,15 +49,27 @@ class ProfessionalHomePage {
       expect(item).toHaveProperty("view_status");
     }
 
-    if (userDetails) {
-      expect(typeof userDetails.notification_count).toBe("number");
-      expect(Array.isArray(userDetails.user_details)).toBe(true);
-      expect(userDetails.user_details[0]).toHaveProperty("email_id");
-      expect(userDetails.user_details[0].user_role).toBe("professional");
-    }
+    expect(typeof userDetails.notification_count).toBe("number");
+    expect(Array.isArray(userDetails.user_details)).toBe(true);
+    expect(userDetails.user_details[0]).toHaveProperty("email_id");
+    expect(userDetails.user_details[0].user_role).toBe("professional");
 
     await expect(this.pathwaysHeading).toBeVisible();
     return { home, notifications, userDetails };
+  }
+
+  /**
+   * For returning to Home later in the same session (e.g. a header nav-link click from another
+   * page) once it's already been loaded once - see waitForLoad()'s doc comment for why that
+   * doesn't reliably produce a fresh, observable network call to wait on. Checks the rendered
+   * content directly instead, including the SAME below-60%/above-30% conditional copy
+   * waitForLoad()'s caller would otherwise have read out of the raw JSON (see
+   * app/(routes)/professional/home/page.js's dynamic_profile_content/render_jobs_carousel).
+   */
+  async checkAlreadyLoaded(action) {
+    if (action) await action();
+    await expect(this.pathwaysHeading).toBeVisible();
+    await this.checkCards();
   }
 
   async checkCards() {
