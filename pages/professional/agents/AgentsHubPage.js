@@ -1,6 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
-const { waitForApiData } = require("../../support/apiEnvelope");
+const { waitForApiData } = require("../../../support/apiEnvelope");
 
 /**
  * /professional/2c_agent. This landing page has no data call of its own - it only reuses the
@@ -11,7 +11,7 @@ const { waitForApiData } = require("../../support/apiEnvelope");
  * correctly while the wait for that response timed out. So waitForLoad() only requires the API
  * call on its default fresh-goto path; a click-based `action` is verified by UI content alone.
  */
-class ProfessionalAgentsPage {
+class ProfessionalAgentsHubPage {
   constructor(page) {
     this.page = page;
     this.jobScoutHeading = page.getByRole("heading", { name: "Job Scout" });
@@ -81,4 +81,4 @@ class ProfessionalAgentsPage {
   }
 }
 
-module.exports = { ProfessionalAgentsPage };
+module.exports = { ProfessionalAgentsHubPage };

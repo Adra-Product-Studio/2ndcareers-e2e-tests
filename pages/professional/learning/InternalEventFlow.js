@@ -1,6 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
-const { waitForApiData } = require("../../support/apiEnvelope");
+const { waitForApiData } = require("../../../support/apiEnvelope");
 
 /**
  * The nested Learning -> event detail -> Book & Pay flow. Event URLs use an opaque encrypted
@@ -14,7 +14,7 @@ const { waitForApiData } = require("../../support/apiEnvelope");
  * button without a designated sandbox/test payment method; doing so on a paid listing would
  * attempt a real charge.
  */
-class LearningEventFlow {
+class ProfessionalInternalEventFlow {
   constructor(page) {
     this.page = page;
     this.detailsButtons = page.getByRole("button", { name: "Details" });
@@ -50,13 +50,19 @@ class LearningEventFlow {
     await expect(this.registerButton).toBeVisible();
   }
 
-  /** Clicks through to Book & Pay and verifies the summary - stops before Confirm & Pay. */
+  /**
+   * Clicks through to Book & Pay and verifies the summary - stops before Confirm & Pay.
+   * app/(routes)/professional/learning/[event_slug]/book_and_pay/page.js shows a full-page
+   * skeleton until its own GET /get_listing_view (page_from=book_and_pay) call resolves - waiting
+   * on that response (not just the URL change) avoids racing that load, the same class of bug
+   * fixed earlier for the Learning see_all sub-pages.
+   */
   async goToBookAndPay() {
-    await this.registerButton.click();
+    await waitForApiData(this.page, /\/get_listing_view/, () => this.registerButton.click());
     await this.page.waitForURL(/\/book_and_pay/, { timeout: 15000 });
     await expect(this.bookingSummaryHeading).toBeVisible();
     await expect(this.confirmButton).toBeVisible();
   }
 }
 
-module.exports = { LearningEventFlow };
+module.exports = { ProfessionalInternalEventFlow };

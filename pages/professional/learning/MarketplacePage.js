@@ -1,6 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
-const { waitForApiData } = require("../../support/apiEnvelope");
+const { waitForApiData } = require("../../../support/apiEnvelope");
 
 /**
  * /professional/learning. Loads via GET /get_training_data - captured live, see
@@ -22,7 +22,7 @@ const { waitForApiData } = require("../../support/apiEnvelope");
  * (not a real link/button element) that navigates to /professional/learning/see_all?q=<recording|
  * resources|perspectives>, each with its own "<N> <items>" count and a "Back to Learnings" button.
  */
-class ProfessionalLearningPage {
+class ProfessionalMarketplacePage {
   constructor(page) {
     this.page = page;
     this.featuredListingsHeading = page.getByRole("heading", { name: "Featured Listings" });
@@ -139,4 +139,4 @@ class ProfessionalLearningPage {
   }
 }
 
-module.exports = { ProfessionalLearningPage };
+module.exports = { ProfessionalMarketplacePage };

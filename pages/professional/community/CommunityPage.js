@@ -1,6 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
-const { waitForApiData } = require("../../support/apiEnvelope");
+const { waitForApiData } = require("../../../support/apiEnvelope");
 
 /**
  * /professional/community. Loads via GET /professional_discourse_community - captured live,

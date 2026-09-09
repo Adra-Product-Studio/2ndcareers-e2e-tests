@@ -1,8 +1,10 @@
 // @ts-check
 // Merges the per-file .webm recordings (one per spec file - see support/sharedPage.js) into a
-// single video covering the whole run, in file order (01-login, 02-home, ... 09-logout). Uses
-// ffmpeg-static (a bundled binary) rather than relying on the machine/CI runner already having
-// ffmpeg installed, so this works the same locally and in CI.
+// single video covering the whole run, in file order (each spec file's videoName is prefixed to
+// match its numbered test folder, e.g. 07-profile-03-experience, so alphabetical directory sort
+// reproduces the suite's real page-by-page order). Uses ffmpeg-static (a bundled binary) rather
+// than relying on the machine/CI runner already having ffmpeg installed, so this works the same
+// locally and in CI.
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");

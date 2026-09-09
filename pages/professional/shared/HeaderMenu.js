@@ -1,6 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
-const { waitForApiData } = require("../../support/apiEnvelope");
+const { waitForApiData } = require("../../../support/apiEnvelope");
 
 /**
  * The professional section's shared header, present with the same structure on every

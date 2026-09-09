@@ -1,0 +1,46 @@
+// @ts-check
+const { test } = require("@playwright/test");
+const { useSharedPage } = require("../../../support/sharedPage");
+const { ProfessionalExternalEventPage } = require("../../../pages/professional/learning/ExternalEventPage");
+const { credentialsFor } = require("../../../fixtures/credentials");
+
+const { hasCredentials } = credentialsFor("professional");
+
+/**
+ * /professional/learning/external_event - a distinct route/page from the internal event detail
+ * (see pages/professional/learning/ExternalEventPage.js doc comment). Unpaid events register via
+ * a plain window.open(registration_link) with no internal payment call at all (confirmed live) -
+ * that's the only branch exercised end-to-end here; a paid external event would go through
+ * Razorpay/Stripe and is left untouched, same as the internal event flow.
+ */
+test.describe("Professional - Learning - external event detail", () => {
+  const session = useSharedPage(test, { videoName: "05-learning-04-external-event" });
+  test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
+
+  // Shared with the second test below - both need to skip together when no external event is
+  // found (the second test has nothing to act on otherwise).
+  let foundExternalEvent = false;
+
+  test("opens an external event's details from the marketplace", async () => {
+    // May need several scroll-and-click attempts to find an external (vs. internal) card, each
+    // waiting out the marketplace's own loading-skeleton race - more headroom than the default.
+    test.setTimeout(150_000);
+    const external = new ProfessionalExternalEventPage(session.page);
+    await external.goto();
+    foundExternalEvent = await external.openFirstExternalEventDetails();
+    // Only the first ~7 preview cards are checked (see ExternalEventPage.js) - none being
+    // external right now is a real, data-dependent state, not a bug, so this skips rather than
+    // fails. The internal-event equivalent of this flow is already covered end-to-end in
+    // 03-internal-event.spec.js regardless of which variant today's cards happen to be.
+    test.skip(!foundExternalEvent, "No external event among the current preview cards on /professional/learning - nothing to test against right now.");
+    await external.checkDetailPage();
+  });
+
+  test("an unpaid external event's Register button opens registration_link in a new tab", async () => {
+    test.skip(!foundExternalEvent, "No external event was found in the previous test - nothing to act on here either.");
+    const page = session.page;
+    const external = new ProfessionalExternalEventPage(page);
+    test.skip(!(await external.isUnpaidRegisterButton()), "This particular external event is paid - registration goes through Razorpay/Stripe, not exercised here.");
+    await external.registerForUnpaidEvent();
+  });
+});

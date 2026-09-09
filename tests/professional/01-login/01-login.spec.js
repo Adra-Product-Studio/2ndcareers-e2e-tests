@@ -1,8 +1,8 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
-const { useSharedPage, AUTH_FILE } = require("../../support/sharedPage");
-const { LoginPage } = require("../../pages/LoginPage");
-const { credentialsFor } = require("../../fixtures/credentials");
+const { useSharedPage, AUTH_FILE } = require("../../../support/sharedPage");
+const { LoginPage } = require("../../../pages/LoginPage");
+const { credentialsFor } = require("../../../fixtures/credentials");
 
 /**
  * Runs first (numbered 01) so its saved storageState (AUTH_FILE) exists before every other

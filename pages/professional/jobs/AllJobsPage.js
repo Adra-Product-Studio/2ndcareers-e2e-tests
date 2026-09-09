@@ -1,6 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
-const { waitForApiData } = require("../../support/apiEnvelope");
+const { waitForApiData } = require("../../../support/apiEnvelope");
 
 /**
  * /professional/jobs/all_jobs and its 3 tabs. All 4 tabs share the same header/tab-bar; each
@@ -14,7 +14,7 @@ const { waitForApiData } = require("../../support/apiEnvelope");
  * Clicking a job card opens a detail pane in the same page (URL gains an encrypted slug) backed
  * by POST /selected_job_details (data: [{job_id, job_title, applied_status, saved_status, ...}]).
  */
-class ProfessionalJobsPage {
+class ProfessionalAllJobsPage {
   constructor(page) {
     this.page = page;
     this.allJobsTab = page.getByRole("link", { name: "All Jobs" });
@@ -36,6 +36,9 @@ class ProfessionalJobsPage {
     this.removeJobButton = page.getByRole("button", { name: "Remove" });
     this.resultsCount = page.getByText(/Showing \d+ - \d+ of \d+ Jobs/);
     this.jobDescriptionHeading = page.getByRole("heading", { name: "Job Description" });
+    this.applyForJobModalHeading = page.getByRole("heading", { name: "Apply for job" });
+    this.completeProfileLink = page.getByRole("link", { name: "My Profile." });
+    this.modalCloseButton = page.getByRole("button", { name: "Close" });
   }
 
   /** Plain navigation for UI-only checks that don't need to re-validate the API call. */
@@ -206,6 +209,27 @@ class ProfessionalJobsPage {
     await this.allJobsTab.click();
     await this.page.waitForURL(/\/all_jobs/);
   }
+
+  /**
+   * Apply Now on a sponsored job is gated by `is_eligible_to_apply_job = profile_percentage
+   * >= 60` (components/cards/job_card/index.js) - below that, it opens a "complete your
+   * profile" modal instead of the real application form. This test account sits at ~53%
+   * complete, so this is the ONLY Apply Now path safe to exercise end-to-end: the real
+   * submission (POST /professional_job_apply) never fires here. Confirmed live. If this
+   * account's profile percentage is ever raised to >=60%, this exact modal stops appearing and
+   * the real apply form (resume/cover-letter/questions, per apply_job_validator) would show
+   * instead - that path is intentionally NOT automated (see e2e-tests/README.md: applying
+   * creates a real, permanent applicant record with no withdraw capability anywhere in the
+   * codebase).
+   */
+  async checkApplyGatedByIncompleteProfile() {
+    await this.applyNowButton.click();
+    await expect(this.applyForJobModalHeading).toBeVisible();
+    await expect(this.page.getByText(/complete your profile to apply for the job/)).toBeVisible();
+    await expect(this.completeProfileLink).toHaveAttribute("href", "/professional/profile");
+    await this.modalCloseButton.click();
+    await expect(this.applyForJobModalHeading).toBeHidden();
+  }
 }
 
-module.exports = { ProfessionalJobsPage };
+module.exports = { ProfessionalAllJobsPage };
