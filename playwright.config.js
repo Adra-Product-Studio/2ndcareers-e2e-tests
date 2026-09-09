@@ -35,7 +35,9 @@ const OPEN_REPORT = process.env.PW_OPEN_REPORT === "true";
 
 module.exports = defineConfig({
   testDir: "./tests",
-  timeout: 30 * 1000,
+  // Generous enough to cover a cold Turbopack compile of the post-login route on a local
+  // dev server (see tests/auth/login.shared.js) - a built staging/CI run finishes well under this.
+  timeout: 60 * 1000,
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,

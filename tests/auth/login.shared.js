@@ -47,15 +47,20 @@ function registerLoginFlowTest(role) {
 
       await loginPage.submitCredentials({ email, password });
 
+      // Generous timeout: on a local dev server (Turbopack) the destination route can still
+      // be cold-compiling on first visit (observed 8-20s+ for a fresh route) - a built
+      // staging/CI environment resolves this almost immediately, so it doesn't slow those runs.
+      const REDIRECT_TIMEOUT = 45000;
+
       if (role === "superadmin") {
         // Non-local builds hand off to a separate admin app via window.location.href
         // instead of an in-app route - accept either outcome.
         await page.waitForURL(
           (url) => url.href.includes("super_admin_access_token=") || url.pathname.startsWith("/super_admin"),
-          { timeout: 15000 }
+          { timeout: REDIRECT_TIMEOUT }
         );
       } else {
-        await expect(page).toHaveURL(new RegExp(redirectPath.replace(/\//g, "\\/")), { timeout: 15000 });
+        await expect(page).toHaveURL(new RegExp(redirectPath.replace(/\//g, "\\/")), { timeout: REDIRECT_TIMEOUT });
       }
     });
   });
