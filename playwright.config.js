@@ -54,10 +54,11 @@ module.exports = defineConfig({
     baseURL: BASE_URL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    // Every spec file shares one browser context across all of its tests (support/sharedPage.js),
-    // so this records one continuous video per file - the whole walkthrough for that page, pass
-    // or fail - not just a clip of a failure. That's what CI uploads as e2e-videos-<sha>.
-    video: "on",
+    // Video is NOT set here - no test ever touches Playwright's own page/context fixture (see
+    // support/sharedPage.js for why), so a `video` option here would silently do nothing.
+    // Recording is requested directly on each file's newContext() call instead, keyed by
+    // `videoName` - one continuous .webm per spec file, which scripts/merge-videos.js then
+    // stitches into the single file CI uploads as e2e-automation-<sha>.
     viewport: MAXIMIZE ? null : undefined,
     launchOptions: {
       slowMo: SLOW_MO,
