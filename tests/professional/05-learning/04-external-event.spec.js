@@ -1,5 +1,5 @@
 // @ts-check
-const { test } = require("@playwright/test");
+const { test, expect } = require("@playwright/test");
 const { useSharedPage } = require("../../../support/sharedPage");
 const { ProfessionalExternalEventPage } = require("../../../pages/professional/learning/ExternalEventPage");
 const { HeaderMenu } = require("../../../pages/professional/shared/HeaderMenu");
@@ -50,5 +50,27 @@ test.describe("Professional - Learning - external event detail", () => {
     // every browser fires a "popup" event for window.open("") the same way, so a miss here is
     // treated as inconclusive rather than a hard failure (see ExternalEventPage.js).
     test.skip(!opened, "No popup opened for this particular event - its registration_link may be empty in real data.");
+  });
+
+  // Whatever the two tests above found (or didn't), 06-agents needs a known-good page to enter
+  // from - a specific PAID external event's own detail page was observed live (CI) to leave the
+  // header's nav-link clicks unable to find their target for the rest of the test timeout,
+  // whatever the real cause turns out to be (not reproducible locally - this account's local
+  // data never surfaces a paid external event as the first match). Tries the same real click
+  // every other transition in this suite uses first, since that's still what actually happens
+  // most of the time; a plain page.goto() is a deliberate, narrowly-scoped fallback if that
+  // click doesn't land quickly, so this one data-dependent page can never block the rest of the
+  // suite for a full test timeout the way it did in CI.
+  test("returns to the Learning marketplace, a known-good page for the next chapter", async () => {
+    const page = session.page;
+    try {
+      // A short, explicit timeout (not the default, which would otherwise wait out this whole
+      // test's 60s budget) - this is what actually lets the goto() fallback below run at all.
+      await page.locator("#professional_nav_learning_link").click({ timeout: 10_000 });
+      await page.waitForURL(/\/professional\/learning$/, { timeout: 10_000 });
+    } catch {
+      await page.goto("/professional/learning");
+    }
+    await expect(page.getByRole("heading", { name: "Featured Listings" })).toBeVisible();
   });
 });
