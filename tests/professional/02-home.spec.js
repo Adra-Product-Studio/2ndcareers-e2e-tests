@@ -8,7 +8,7 @@ const { credentialsFor } = require("../../fixtures/credentials");
 const { hasCredentials } = credentialsFor("professional");
 
 test.describe("Professional - home", () => {
-  const session = useSharedPage(test);
+  const session = useSharedPage(test, { videoName: "02-home" });
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login.spec.js to have signed in first.");
 
   test("loads dashboard data with the expected keys and values", async () => {

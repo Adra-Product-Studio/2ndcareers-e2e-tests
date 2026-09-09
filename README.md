@@ -118,10 +118,16 @@ charge.
   `*_TEST_EMAIL` / `*_TEST_PASSWORD` GitHub Actions secrets.
 - Converts the HTML report to a PDF (`npm run report:pdf`) and uploads it as a build artifact
   on every run.
-- On pull requests, a separate job diffs `app/`, `components/`, `services/`, `store/`,
-  `validate/`, and `utils/` against the PR base and posts a comment showing which pages are
-  new and, for modified files, a diff of what changed - so a reviewer can confirm the old
-  logic vs. the new logic before merging.
+- Uploads one `.webm` recording per spec file (`e2e-videos-<sha>`) - the actual automation,
+  watchable directly, rather than the raw trace.zip/screenshot.png/error-context.md bundle
+  Playwright also writes to `test-results/`. See the `videoName` note in `support/sharedPage.js`
+  for why recording has to be requested explicitly there instead of via `playwright.config.js`.
+- On every push, a `logic-diff` job diffs `app/`, `components/`, `services/`, `store/`,
+  `validate/`, and `utils/` against the previous commit on that branch (or the PR base, on a
+  pull request) and renders the summary in the run's own Summary page - on a pull request it
+  also posts/updates a PR comment, so a reviewer can confirm the old logic vs. the new logic
+  before merging. Can also be triggered manually (Actions tab -> "Run workflow") with your own
+  base/head refs.
 
 ## Adding new tests
 

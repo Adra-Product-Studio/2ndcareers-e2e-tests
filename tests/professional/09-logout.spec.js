@@ -13,7 +13,7 @@ const { hasCredentials } = credentialsFor("professional");
  * login page, closing the loop for this role's journey.
  */
 test.describe("Professional - logout", () => {
-  const session = useSharedPage(test);
+  const session = useSharedPage(test, { videoName: "09-logout" });
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login.spec.js to have signed in first.");
 
   test("signs out from the profile menu and returns to the login page", async () => {

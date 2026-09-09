@@ -14,7 +14,7 @@ const { hasCredentials } = credentialsFor("professional");
  * - Sign out itself is covered separately in 09-logout.spec.js.
  */
 test.describe("Professional - profile dropdown pages", () => {
-  const session = useSharedPage(test);
+  const session = useSharedPage(test, { videoName: "07-profile-menu" });
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login.spec.js to have signed in first.");
 
   test("dropdown lists all 4 pages plus Sign out", async () => {

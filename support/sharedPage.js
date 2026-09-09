@@ -23,23 +23,33 @@ const AUTH_FILE = path.join(__dirname, "..", ".auth", "professional.json");
  * Pass `authenticated: true` (default) to start already logged in via the storageState that
  * 01-login.spec.js saves after a successful login. Pass `authenticated: false` for that file
  * itself, which needs a clean, logged-out context.
+ *
+ * Pass `videoName` (e.g. "01-login") to record this file's whole run as one .webm - one
+ * continuous video per file, matching the one-window-per-file model above. This can't be done
+ * via playwright.config.js's `use.video` option: that only applies to contexts Playwright's own
+ * `context`/`page` fixtures create, and this deliberately creates its own instead (see above) -
+ * so recording has to be requested directly on this newContext() call.
  */
-function useSharedPage(test, { authenticated = true } = {}) {
+function useSharedPage(test, { authenticated = true, videoName = "session" } = {}) {
   test.describe.configure({ mode: "serial" });
 
-  const session = { page: null };
+  const session = { page: null, context: null };
 
   test.beforeAll(async ({ browser }) => {
     // Falls back to a logged-out context if 01-login.spec.js hasn't run yet (or skipped saving
     // state because no credentials were configured) - tests here then fail with clear
     // "not logged in" errors instead of a confusing ENOENT reading a storageState that doesn't exist.
     const useAuth = authenticated && fs.existsSync(AUTH_FILE);
-    const context = await browser.newContext(useAuth ? { storageState: AUTH_FILE } : {});
-    session.page = await context.newPage();
+    session.context = await browser.newContext({
+      ...(useAuth ? { storageState: AUTH_FILE } : {}),
+      recordVideo: { dir: path.join(__dirname, "..", "test-results", "videos", videoName) },
+    });
+    session.page = await session.context.newPage();
   });
 
   test.afterAll(async () => {
-    await session.page.close();
+    // Closing the context (not just the page) is what finalizes and writes the video file.
+    await session.context.close();
   });
 
   return session;

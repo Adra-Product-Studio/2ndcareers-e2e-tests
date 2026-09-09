@@ -11,7 +11,7 @@ const { hasCredentials } = credentialsFor("professional");
  * pages/professional/LearningEventFlow.js for why (real payment gateway).
  */
 test.describe("Professional - learning event details and booking", () => {
-  const session = useSharedPage(test);
+  const session = useSharedPage(test, { videoName: "08-learning-book-and-pay" });
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login.spec.js to have signed in first.");
 
   test("opens an event's details with the expected keys and values", async () => {

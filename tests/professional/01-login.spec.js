@@ -10,7 +10,7 @@ const { credentialsFor } = require("../../fixtures/credentials");
  * logged-out context, so it opts out of the default "start authenticated" behavior.
  */
 test.describe("Professional - login", () => {
-  const session = useSharedPage(test, { authenticated: false });
+  const session = useSharedPage(test, { authenticated: false, videoName: "01-login" });
   const { email, password, redirectPath, hasCredentials } = credentialsFor("professional");
 
   test("shows the sign-in form", async () => {

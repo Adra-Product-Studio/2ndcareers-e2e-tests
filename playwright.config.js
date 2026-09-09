@@ -54,7 +54,10 @@ module.exports = defineConfig({
     baseURL: BASE_URL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    // Every spec file shares one browser context across all of its tests (support/sharedPage.js),
+    // so this records one continuous video per file - the whole walkthrough for that page, pass
+    // or fail - not just a clip of a failure. That's what CI uploads as e2e-videos-<sha>.
+    video: "on",
     viewport: MAXIMIZE ? null : undefined,
     launchOptions: {
       slowMo: SLOW_MO,
