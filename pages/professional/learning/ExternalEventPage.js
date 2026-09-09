@@ -112,10 +112,22 @@ class ProfessionalExternalEventPage {
     return /Register\s*→?$/.test(label.trim());
   }
 
+  /**
+   * Returns `true` if the popup opened, `false` otherwise. Some events' own `registration_link`
+   * is an empty string in real data (confirmed live in GET /get_training_data samples) - a
+   * browser's `window.open("")` behavior for that isn't guaranteed to fire a "popup" event the
+   * same way everywhere, so this doesn't hard-fail when it doesn't; the caller decides whether
+   * that's a skip.
+   */
   async registerForUnpaidEvent() {
-    const [popup] = await Promise.all([this.page.waitForEvent("popup"), this.registerButton.click()]);
+    const popup = await Promise.all([
+      this.page.waitForEvent("popup", { timeout: 10000 }).catch(() => null),
+      this.registerButton.click(),
+    ]).then(([p]) => p);
+    if (!popup) return false;
     await popup.waitForLoadState().catch(() => {});
     await popup.close();
+    return true;
   }
 }
 

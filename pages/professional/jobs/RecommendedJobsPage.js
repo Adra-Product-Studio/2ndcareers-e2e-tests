@@ -43,8 +43,11 @@ class ProfessionalRecommendedJobsPage {
   async waitForLoadBelowThreshold(action = () => this.goto()) {
     await action();
     await expect(this.resultsCount).toHaveText("Showing 0 Jobs");
-    await expect(this.completeProfilePrompt).toBeVisible();
-    await expect(this.completeProfileLink).toHaveAttribute("href", "/professional/profile");
+    // .first() - confirmed on CI/staging this text renders as multiple duplicate elements (a
+    // responsive mobile/desktop markup duplication, same class of issue as the header's hidden
+    // off-canvas nav), which a plain toBeVisible() treats as a strict-mode violation.
+    await expect(this.completeProfilePrompt.first()).toBeVisible();
+    await expect(this.completeProfileLink.first()).toHaveAttribute("href", "/professional/profile");
   }
 
   /** Local (client-side) filtering - no network call to wait for, just the UI updating. */
