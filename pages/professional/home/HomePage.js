@@ -140,19 +140,40 @@ class ProfessionalHomePage {
   }
 
   /**
-   * The home dashboard's "COMMUNITY" quick-access card opens https://app.2ndcareers.com in a
-   * NEW TAB (verified live via browser_tabs - not an in-app route, despite looking like one).
-   * This one really is purely external - but the header's own top-nav "Community" link is NOT
-   * (found via code, not assumed): it also fires a real router.push to the internal
-   * /professional/community page on the same click, alongside opening Discourse in a new tab -
-   * see HeaderMenu.js's communityNavLink/goToCommunity() and tests/professional/08-community.
-   * This catches the popup instead of following it, leaving the main page/session untouched.
+   * The home dashboard's "COMMUNITY" quick-access card opens a NEW TAB (not an in-app route,
+   * despite looking like one) - a real 3-hop SSO redirect chain through a genuinely external,
+   * third-party-hosted Discourse instance, confirmed live by tracing the popup's own URL over
+   * time:
+   *   1. https://2ndcareers-community.discourse.group/login  (this card's own real link_path -
+   *      json/json_data/professional/index.js's home_start_exploring, NEXT_PUBLIC_URL_DISCOURSE_URL)
+   *   2. https://app.2ndcareers.com/professional/community?sso=...&sig=...  (Discourse's SSO
+   *      handoff back to the main app)
+   *   3. https://app.2ndcareers.com/  (where it settles, when this external chain completes)
+   * How long hop 1 -> hop 2 actually takes is entirely up to that external Discourse instance's
+   * own responsiveness (rate limiting, session state, its own load) - confirmed live to
+   * sometimes complete in ~1s and other times not complete within 20+s with no code change in
+   * between, on the SAME account. What this check actually owns is verifying OUR app opens the
+   * right external flow at all, not how fast a third party's SSO handshake happens to run today -
+   * so this accepts the popup landing anywhere in this real, known chain (hop 1 OR hop 2/3),
+   * rather than demanding the full handoff complete within some arbitrary budget.
+   *
+   * The header's own top-nav "Community" link is NOT purely external the same way (found via
+   * code, not assumed): it also fires a real router.push to the internal /professional/community
+   * page on the same click, alongside opening this same Discourse popup - see HeaderMenu.js's
+   * communityNavLink/goToCommunity() and tests/professional/08-community. This catches the popup
+   * instead of following it, leaving the main page/session untouched.
    */
   async checkCommunityCardOpensExternalApp() {
     const [popup] = await Promise.all([this.page.waitForEvent("popup"), this.communityCard.click()]);
-    await popup.waitForLoadState();
-    expect(popup.url()).toContain("app.2ndcareers.com");
-    await popup.close();
+    // try/finally: an open popup left behind by a failed assertion is one more tab competing for
+    // this shared browser's resources for the rest of the run - closing it regardless of outcome
+    // is cheap insurance against that making anything after this test slower or flakier.
+    try {
+      await popup.waitForURL(/discourse\.group|app\.2ndcareers\.com/, { timeout: 20_000 });
+      expect(popup.url()).toMatch(/discourse\.group|app\.2ndcareers\.com/);
+    } finally {
+      await popup.close().catch(() => {});
+    }
   }
 
   /**
