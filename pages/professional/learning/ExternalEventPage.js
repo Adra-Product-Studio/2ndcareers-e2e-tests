@@ -1,7 +1,7 @@
 // @ts-check
 const { expect } = require("@playwright/test");
 const { waitForApiDataMulti } = require("../../../support/apiEnvelope");
-const { mockApiField, clearMock } = require("../../../support/mockResponse");
+const { mockApiField } = require("../../../support/mockResponse");
 const { reapplyChatbotGuard } = require("../../../support/chatbotGuard");
 
 /**
@@ -158,15 +158,25 @@ class ProfessionalExternalEventPage {
       return json;
     });
 
-    const [response] = await Promise.all([this.page.waitForResponse(EVENT_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
-    expect(response.ok()).toBe(true);
-    await reapplyChatbotGuard(this.page);
+    // try/finally: if this mocked reload or either assertion below ever hangs or throws (a slow
+    // CI runner, a genuine regression), leaving the mock registered and/or this page stuck
+    // mid-navigation would take every single test that runs after this one down with it for the
+    // rest of this shared session - confirmed the hard way in CI. The reload itself is real
+    // navigation, not just a route - a failed Promise.all here can leave it mid-flight, so the
+    // recovery below is a second, unmocked reload back to this same page, not just an unroute.
+    try {
+      const [response] = await Promise.all([this.page.waitForResponse(EVENT_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
+      expect(response.ok()).toBe(true);
+      await reapplyChatbotGuard(this.page);
 
-    await expect(this.registerButton).toHaveText("Registered");
-    // The real gap: still enabled, not disabled, despite the label claiming registration is done.
-    await expect(this.registerButton).toBeEnabled();
-
-    await clearMock(this.page, EVENT_ENDPOINT);
+      await expect(this.registerButton).toHaveText("Registered");
+      // The real gap: still enabled, not disabled, despite the label claiming registration done.
+      await expect(this.registerButton).toBeEnabled();
+    } finally {
+      await this.page.unrouteAll({ behavior: "ignoreErrors" });
+      await this.page.reload({ timeout: 30_000 }).catch(() => {});
+      await reapplyChatbotGuard(this.page);
+    }
   }
 }
 

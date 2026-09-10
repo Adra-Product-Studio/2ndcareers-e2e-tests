@@ -1,6 +1,6 @@
 // @ts-check
 const { expect } = require("@playwright/test");
-const { mockApiField, clearMock } = require("../../../support/mockResponse");
+const { mockApiField } = require("../../../support/mockResponse");
 const { reapplyChatbotGuard } = require("../../../support/chatbotGuard");
 
 const USAGE_ENDPOINT = /\/professional_job_recommendation_usage/;
@@ -110,20 +110,24 @@ class ProfessionalCareerCopilotsPage {
       return json;
     });
 
-    const [response] = await Promise.all([this.page.waitForResponse(USAGE_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
-    expect(response.ok()).toBe(true);
-    await reapplyChatbotGuard(this.page);
+    // try/finally: a hung mocked reload or a failed assertion here must never leave the mock
+    // active or this page stuck mid-navigation - every test after this one in the shared session
+    // would cascade-fail behind it (confirmed the hard way in CI on this exact class of method).
+    try {
+      const [response] = await Promise.all([this.page.waitForResponse(USAGE_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
+      expect(response.ok()).toBe(true);
+      await reapplyChatbotGuard(this.page);
 
-    await expect(this.runsRemainingText).toHaveText("Runs Remaining: 0");
-    await expect(this.page.getByRole("heading", { name: "Limit has been reached" })).toBeVisible();
-    await expect(this.messageInput).toBeDisabled();
-
-    await clearMock(this.page, USAGE_ENDPOINT);
-    // Back to this account's real remaining count for anything that runs after this - leave no
-    // mocked state (even a cleared one) sitting on an already-rendered page.
-    const [restore] = await Promise.all([this.page.waitForResponse(USAGE_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
-    expect(restore.ok()).toBe(true);
-    await reapplyChatbotGuard(this.page);
+      await expect(this.runsRemainingText).toHaveText("Runs Remaining: 0");
+      await expect(this.page.getByRole("heading", { name: "Limit has been reached" })).toBeVisible();
+      await expect(this.messageInput).toBeDisabled();
+    } finally {
+      // Back to this account's real remaining count for anything that runs after this - leave no
+      // mocked state (even a cleared one) sitting on an already-rendered page.
+      await this.page.unrouteAll({ behavior: "ignoreErrors" });
+      await this.page.reload({ timeout: 30_000 }).catch(() => {});
+      await reapplyChatbotGuard(this.page);
+    }
     await expect(this.naviHeading).toBeVisible();
   }
 
