@@ -164,8 +164,13 @@ class ProfessionalExternalEventPage {
     // rest of this shared session - confirmed the hard way in CI. The reload itself is real
     // navigation, not just a route - a failed Promise.all here can leave it mid-flight, so the
     // recovery below is a second, unmocked reload back to this same page, not just an unroute.
+    // 60s, not this suite's usual 30s: CI runs this specific check against the real staging
+    // backend (not a local dev server), and this individual-event lookup was observed live in CI
+    // to occasionally take longer than 30s to answer - confirmed NOT a client-side hang (the
+    // route handler's own request/response events were still in flight, per the same class of
+    // instrumentation used to diagnose this suite's earlier "Route is already handled!" bug).
     try {
-      const [response] = await Promise.all([this.page.waitForResponse(EVENT_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
+      const [response] = await Promise.all([this.page.waitForResponse(EVENT_ENDPOINT, { timeout: 60_000 }), this.page.reload()]);
       expect(response.ok()).toBe(true);
       await reapplyChatbotGuard(this.page);
 
@@ -173,8 +178,13 @@ class ProfessionalExternalEventPage {
       // The real gap: still enabled, not disabled, despite the label claiming registration done.
       await expect(this.registerButton).toBeEnabled();
     } finally {
+      // A plain reload of this SAME page was observed live (CI) to not actually recover anything
+      // when the failure above was this page's own data endpoint hanging - reloading the exact
+      // same URL just re-issues the exact same slow/stuck request. Navigating to a KNOWN, DIFFERENT
+      // page instead doesn't depend on that endpoint at all, so it recovers regardless of whether
+      // the underlying problem was this page specifically or something broader.
       await this.page.unrouteAll({ behavior: "ignoreErrors" });
-      await this.page.reload({ timeout: 30_000 }).catch(() => {});
+      await this.page.goto("/professional/learning", { timeout: 60_000 }).catch(() => {});
       await reapplyChatbotGuard(this.page);
     }
   }

@@ -54,6 +54,10 @@ test.describe("Professional - Learning - external event detail", () => {
 
   test("the Register button never actually disables itself once already registered - a real gap, confirmed without clicking it", async () => {
     test.skip(!foundExternalEvent, "No external event was found in the first test - nothing to act on here either.");
+    // The default 60s test budget doesn't leave enough room for this method's own up-to-60s
+    // response wait plus its finally-block recovery reload - see ExternalEventPage.js's doc
+    // comment on checkRegisterButtonMissingDisabledState for why that wait is this generous.
+    test.setTimeout(150_000);
     const external = new ProfessionalExternalEventPage(session.page);
     await external.checkRegisterButtonMissingDisabledState();
   });
