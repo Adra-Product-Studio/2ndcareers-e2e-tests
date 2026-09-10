@@ -49,6 +49,17 @@ class ProfessionalAllJobsPage {
     // "Jump forward"/"Jump backward" for the "..." ellipsis buttons (also excluded).
     this.paginationPageButtons = page.getByRole("button", { name: /^Page \d+$/ });
     this.jobCards = page.locator("main").getByRole("heading", { level: 6 });
+    // Scoped to cards showing the "2nd Careers Sponsored job" badge (components/cards/job_card/
+    // index.js: show_sponsored_or_non_sponsored_badge, true on this tab for every card either
+    // way) - the title heading and badge are sibling elements inside the same wrapper, confirmed
+    // live. Sponsored-ness (job.pricing_category truthy) is what actually gates a job's Save
+    // button and its Apply-Now behavior (is_sponsored/is_eligible_to_apply_job, same file) - a
+    // non-sponsored job has NO Save button at all and its Apply Now just opens apply_link in a
+    // new tab instead of the profile-incomplete modal, confirmed live - see openFirstJobDetail().
+    this.sponsoredJobHeadings = page
+      .locator("main div.job_card_header_details")
+      .filter({ has: page.locator(".sponsored_job_badge") })
+      .getByRole("heading", { level: 6 });
     this.applyNowButton = page.getByRole("button", { name: "Apply Now" });
     this.saveJobButton = page.getByRole("button", { name: "Save", exact: true });
     this.savedJobButton = page.getByRole("button", { name: "Saved", exact: true });
@@ -62,6 +73,14 @@ class ProfessionalAllJobsPage {
     this.applyForJobModalHeading = page.getByRole("heading", { name: "Apply for job" });
     this.completeProfileLink = page.getByRole("link", { name: "My Profile." });
     this.modalCloseButton = page.getByRole("button", { name: "Close" });
+    // A Bootstrap dropdown (components/Sort_by/index.js), not a native <select> - "Sort by" is
+    // this button's own fixed label text, concatenated with whichever option is currently chosen
+    // (e.g. "Sort byDefault"), confirmed live to be unique on this page.
+    this.sortByTrigger = page.getByText("Sort by");
+    // The empty-state placeholder (components/cards/job_card/index.js's JobNotFoundCard, only
+    // reachable via a filter/search combination this real dataset happens to have zero matches
+    // for - see checkEmptyResultsState()) renders solely as this image, no text of its own.
+    this.noResultsImage = page.getByAltText("no_data_image");
   }
 
   /** Plain navigation for UI-only checks that don't need to re-validate the API call. */
@@ -105,18 +124,6 @@ class ProfessionalAllJobsPage {
     await expect(this.filterButton).toBeVisible();
   }
 
-  /** This test account has 0 AI-matched jobs, so no listing endpoint call fires at all here. */
-  async goToRecommendedTab() {
-    await this.recommendedTab.click();
-    await this.page.waitForURL(/\/recommended_jobs/);
-    await expect(this.page.getByText(/Showing \d+ Jobs?/)).toBeVisible();
-  }
-
-  async goToAppliedTab() {
-    const data = await waitForApiData(this.page, /\/professional_applied_jobs/, () => this.appliedTab.click());
-    return this._checkTabListing(data);
-  }
-
   async goToSavedTab() {
     const data = await waitForApiData(this.page, /\/professional_saved_jobs/, () => this.savedTab.click());
     return this._checkTabListing(data);
@@ -138,9 +145,20 @@ class ProfessionalAllJobsPage {
     return jobs;
   }
 
-  /** Clicks the first job card on All Jobs - opens its detail pane in the same page. */
+  /**
+   * Clicks the first SPONSORED job card on All Jobs (falling back to the first card of any kind
+   * if the current page happens to have no sponsored ones) - opens its detail pane in the same
+   * page. Deliberately not just "the first card": every real job in this dataset is sponsored
+   * today, but this account's incomplete-profile Apply-Now gate AND the Save button itself both
+   * only exist for sponsored jobs (see sponsoredJobHeadings above) - callers of this method
+   * (saveCurrentJob, checkApplyGatedByIncompleteProfile) would silently hang waiting for a Save
+   * button that doesn't render at all if a future non-sponsored listing were ever the first card
+   * on whichever page goToRandomPage() happens to land on.
+   */
   async openFirstJobDetail() {
-    const data = await waitForApiData(this.page, /\/selected_job_details/, () => this.jobCards.first().click());
+    const hasSponsored = (await this.sponsoredJobHeadings.count()) > 0;
+    const target = hasSponsored ? this.sponsoredJobHeadings.first() : this.jobCards.first();
+    const data = await waitForApiData(this.page, /\/selected_job_details/, () => target.click());
     const job = Array.isArray(data) ? data[0] : data;
 
     expect(job).toHaveProperty("job_id");
@@ -187,6 +205,45 @@ class ProfessionalAllJobsPage {
     return { initialCount, filteredCount, restoredCount };
   }
 
+  /**
+   * A guaranteed-zero-match search (a random string no real job title/description/company/skill
+   * will ever contain) - confirmed live this renders JobNotFoundCard (see noResultsImage above)
+   * with a "Showing 0 Jobs" count and no job cards at all, distinct from applyFilterAndSearch's
+   * own filter+search combo, which only sometimes lands on zero depending on live data. Restores
+   * the original listing afterward via the search icon's "clear" state, same as searchFor().
+   */
+  async checkEmptyResultsState() {
+    const gibberishQuery = `zzz-e2e-no-match-${Date.now()}`;
+    await waitForApiData(this.page, /\/admin_jobs_meilisearch/, async () => {
+      await this.searchInput.pressSequentially(gibberishQuery, { delay: 90 });
+      await this.searchInput.press("Enter");
+    });
+
+    await expect(this.resultsCount).toHaveText("Showing 0 Jobs");
+    await expect(this.noResultsImage).toBeVisible();
+    expect(await this.jobCards.count()).toBe(0);
+
+    await waitForApiData(this.page, /\/professional_dashboard/, () => this.searchIcon.click());
+  }
+
+  /**
+   * json/json_data/professional/index.js's job_sort_by_options (copied as literal fixture data,
+   * outside this suite's read-only exception for json/): Default, Date Latest, Date Oldest, A-Z,
+   * Z-A. A Bootstrap dropdown (components/Sort_by/index.js), not a native <select> - selecting any
+   * option re-fetches through the SAME POST /professional_dashboard the initial load uses
+   * (app/(routes)/professional/jobs/all_jobs/layout.js's sort_by_func -> handle_get_all_jobs with
+   * a sort key/param added), confirmed live - unlike Filter/Search, which switch to
+   * /admin_jobs_meilisearch instead. Returns the resulting first card's title so callers can
+   * confirm two opposite sort directions actually produce a different order, not just a request.
+   */
+  async sortBy(optionLabel) {
+    await this.sortByTrigger.click();
+    await waitForApiData(this.page, /\/professional_dashboard/, () =>
+      this.page.getByRole("menuitem", { name: optionLabel }).click()
+    );
+    return ((await this.jobCards.first().textContent()) || "").trim();
+  }
+
   async _resultsTotal() {
     const text = (await this.resultsCount.textContent()) || "";
     // "Showing X - Y of Z Jobs" when there are results, or a plain "Showing 0 Jobs" (no "of"
@@ -197,11 +254,19 @@ class ProfessionalAllJobsPage {
     return Number(match[1]);
   }
 
-  /** Opens the Filter panel, verifies every field is present, then closes it via Apply Filter
-   * (with nothing selected, so the listing itself is unaffected) rather than leaving it open.
-   * Apply Filter always goes through the same mellie-search endpoint as searchFor() above
+  /**
+   * Opens the Filter panel, verifies every field is present, then closes it via Apply Filter
+   * (with nothing selected) before restoring the listing back to exactly how this method found
+   * it. Apply Filter always goes through the same mellie-search endpoint as searchFor() above
    * (services/professional/index.js mellie_search_function("apply_filter") -> POST
-   * /admin_jobs_meilisearch), confirmed live, even with no filters chosen. */
+   * /admin_jobs_meilisearch), confirmed live, even with no filters chosen - and confirmed live
+   * that doing so switches the account from the curated /professional_dashboard listing (79 jobs
+   * at the time this was written) to Mellie's own much broader "browse everything" index (339) -
+   * a real, deliberate mode switch, not a bug, but one this read-only-looking check would
+   * otherwise silently leave behind for whatever runs next. Clear Filter alone (no search text
+   * was ever involved here) is confirmed live to switch is_mellie_searched back off and land back
+   * on /professional_dashboard directly - no separate search-icon click needed.
+   */
   async checkFilterPanel() {
     await this.filterButton.click();
     await expect(this.filterPanelHeading).toBeVisible();
@@ -213,6 +278,10 @@ class ProfessionalAllJobsPage {
 
     await waitForApiData(this.page, /\/admin_jobs_meilisearch/, () => this.applyFilterButton.click());
     await expect(this.filterPanelHeading).toBeHidden();
+
+    await this.filterButton.click();
+    await expect(this.clearFilterButton).toBeVisible();
+    await waitForApiData(this.page, /\/professional_dashboard/, () => this.clearFilterButton.click());
   }
 
   /**

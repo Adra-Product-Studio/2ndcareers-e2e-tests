@@ -24,7 +24,7 @@ test.describe("Professional - Learning - Marketplace", () => {
     await learning.checkAllSectionTitles();
   });
 
-  test("Connect with Experts / Learn Live: 'See all' only shows past 3 listings", async () => {
+  test("Connect with Experts / Learn Live: 'See all' only shows past 3 listings, and really expands/collapses", async () => {
     const learning = new ProfessionalMarketplacePage(session.page);
     await learning.checkConnectWithExpertsVisibility();
     await learning.checkLearnLiveVisibility();

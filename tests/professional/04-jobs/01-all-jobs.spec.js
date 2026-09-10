@@ -34,8 +34,26 @@ test.describe("Professional - Jobs - All Jobs - complete flow", () => {
     await jobs.checkPageElements();
   });
 
+  test("Sort By actually reorders the listing - opposite directions produce a different first result", async () => {
+    const jobs = new ProfessionalAllJobsPage(session.page);
+    const dateLatestFirst = await jobs.sortBy("Date Latest");
+    const dateOldestFirst = await jobs.sortBy("Date Oldest");
+    expect(dateOldestFirst).not.toBe(dateLatestFirst);
+
+    const aToZFirst = await jobs.sortBy("A-Z");
+    const zToAFirst = await jobs.sortBy("Z-A");
+    expect(zToAFirst).not.toBe(aToZFirst);
+
+    // Back to the default order for every test after this one.
+    await jobs.sortBy("Default");
+  });
+
   test("applies a filter and a search together, verifies the results, then clears both back to the full list", async () => {
     const jobs = new ProfessionalAllJobsPage(session.page);
+    // Every filter field a person would see, opened and closed with nothing selected, before the
+    // real filter+search interaction below picks one.
+    await jobs.checkFilterPanel();
+
     const { initialCount, filteredByTypeCount, filteredAndSearchedCount, restoredCount } =
       await jobs.applyFilterAndSearch("manager");
 
@@ -48,6 +66,11 @@ test.describe("Professional - Jobs - All Jobs - complete flow", () => {
     expect(typeof filteredByTypeCount).toBe("number");
     expect(filteredAndSearchedCount).toBeLessThanOrEqual(filteredByTypeCount);
     expect(restoredCount).toBe(initialCount);
+  });
+
+  test("a search with no possible matches shows the real empty state, not just an untested edge case", async () => {
+    const jobs = new ProfessionalAllJobsPage(session.page);
+    await jobs.checkEmptyResultsState();
   });
 
   test("selects a random pagination page", async () => {

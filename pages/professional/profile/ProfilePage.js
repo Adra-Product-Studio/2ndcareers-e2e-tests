@@ -11,11 +11,13 @@ const { waitForApiData } = require("../../../support/apiEnvelope");
  *   - List sections (Experience, Education, Skills, Languages, Additional Information, Social
  *     Media Links): add a clearly-marked temporary entry, verify it, then delete it - the
  *     account's real pre-existing rows are never touched.
- *   - Singleton text sections (About, Preference): read the current value, set a temporary one,
- *     verify, then restore the exact original value.
- * Personal Details is exercised as a no-op save (Edit -> Save with no field changes) - it
- * re-submits the same values already loaded, so the real endpoint is exercised without risking
- * any actual change to the account's data.
+ *   - Singleton text sections (About): read the current value, set a temporary one, verify, then
+ *     restore the exact original value.
+ * Personal Details and Preference are each exercised as a blank/no-change Save attempt instead -
+ * confirmed live, both are blocked by client-side validation before any request fires (this
+ * account's real contact_number is blank; Preference's own value can never be a true no-op
+ * since re-blanking it also fails validation) - see each method's own doc comment below for why
+ * that's actually the more useful check, not a workaround.
  *
  * Resume upload is NOT automated here: confirmed live, uploading ANY file (even the current
  * resume re-uploaded) opens a "New Resume Upload Confirmation" dialog stating "all fields will
@@ -56,8 +58,12 @@ class ProfessionalProfilePage {
     // About (inline edit)
     this.aboutEditButton = this.aboutHeading.locator("../..").getByRole("button", { name: "Edit" });
 
-    // Preference (inline edit)
+    // Preference (inline edit) - scoped the same way as personalDetailsSaveButton, not the
+    // page-wide modalSaveButton below: both this and Personal Details are permanently left
+    // showing their own stray "Save" for this account (see 09-unsavable-sections.spec.js's class
+    // doc comment), so a page-wide exact "Save" match is ambiguous by the time this runs.
     this.preferenceEditButton = this.preferenceHeading.locator("../..").getByRole("button", { name: "Edit" });
+    this.preferenceSaveButton = this.preferenceHeading.locator("../..").getByRole("button", { name: "Save" });
 
     // Modal chrome shared by every "Add X" dialog
     this.modalCloseButton = page.getByRole("button", { name: "Close" });
@@ -102,18 +108,38 @@ class ProfessionalProfilePage {
 
   /**
    * Personal Details toggles the whole card into inline-editable fields (no separate modal, no
-   * Cancel button - Edit becomes Save in place). NOT exercised as a no-op save-and-verify cycle:
-   * confirmed live, this account has no phone number saved (the field renders as bare "+1" with
-   * no digits), and Save is validated client-side to require "Contact Number, Country Code" -
-   * clicking Save with nothing changed fails that validation and never even calls the API, with
-   * no way to make it a true no-op without also permanently adding a phone number. Only checks
-   * that Edit opens the real, pre-filled fields, without ever saving.
+   * Cancel button - the same button IS Edit until clicked once, then IS Save from then on,
+   * app/(routes)/professional/profile/page.js's update_personal_details: a click while
+   * `personal_details_edit` is false just flips that flag and returns, before any validation
+   * ever runs). Confirmed live, this account has no phone number saved (the field renders as
+   * bare "+1" with no digits) - clicking Save immediately after, with NOTHING changed, is
+   * expected to fail personal_details_validator's `contact_number` (and possibly others -
+   * exactly which fields this real account is currently missing isn't asserted here, only that
+   * SOME "required" error blocks it) requirement client-side: validator_fun (validate/index.js)
+   * shows a toast and returns before any request fires. There is no way to make this a true
+   * no-op save without also permanently adding a phone number, so this only ever proves the
+   * gate holds - it never leaves edit mode afterward (nothing later in this suite depends on
+   * Personal Details' own edit state, same as this method already left it before this check
+   * existed).
    */
   async checkPersonalDetailsOpensEditableFields() {
     await this.personalDetailsEditButton.click();
     await expect(this.personalDetailsSaveButton).toBeVisible();
     // getByText doesn't match an <input>'s value - locate it directly instead.
     await expect(this.page.locator('input[value="vetri042628@gmail.com"]')).toBeVisible();
+
+    let requestFired = false;
+    const onRequest = (req) => {
+      if (/\/professional_profile_update/.test(req.url())) requestFired = true;
+    };
+    this.page.on("request", onRequest);
+    await this.personalDetailsSaveButton.click();
+    await expect(this.page.getByText(/required/i).first()).toBeVisible();
+    this.page.off("request", onRequest);
+
+    expect(requestFired).toBe(false);
+    // Still in edit mode - a real save would have flipped Save back to Edit.
+    await expect(this.personalDetailsSaveButton).toBeVisible();
   }
 
   /**
@@ -144,11 +170,13 @@ class ProfessionalProfilePage {
    * as an edit-then-revert cycle like About: validate/professional_profile.js's
    * professional_preferences_validator requires a non-blank value
    * (`if (!params?.preferences) errors.preferences = "Preferences are required"`), confirmed
-   * live - submitting an empty string to clear it back to blank fails client-side validation
-   * silently (the request never fires at all). Once set, there is no way back to this account's
-   * original blank state through the UI, so this only verifies the read-only placeholder and
-   * that Edit opens the real textarea, without ever saving - matching the same
-   * never-mutate-what-can't-be-restored principle as Resume.
+   * live - submitting an empty string to clear it back to blank fails client-side validation, so
+   * once set there would be no way back to this account's original blank state through the UI.
+   * Verifies the read-only placeholder, that Edit opens the real textarea, AND (since the
+   * textarea starts and stays empty here) that clicking Save on it hits exactly that validator
+   * error and never fires a request - a real check, not just a workaround, since this is the one
+   * state this account can safely prove the validator actually blocks: Preference has a single
+   * field, so unlike Personal Details this message is exact and stable.
    */
   async checkPreferenceDisplay() {
     const placeholder = "Your preferences details will be displayed here";
@@ -158,6 +186,24 @@ class ProfessionalProfilePage {
     // Not page.getByRole("textbox").last() - that matches the "Navi" chatbot's own message input
     // instead (confirmed live, see _editSingletonText's doc comment).
     await expect(scope.getByRole("textbox")).toBeVisible();
+
+    let requestFired = false;
+    const onRequest = (req) => {
+      if (/\/professional_preferences_update|\/professional_preference/.test(req.url())) requestFired = true;
+    };
+    this.page.on("request", onRequest);
+    await this.preferenceSaveButton.click();
+    // "is", not "are" - validate/index.js's validator_fun builds its OWN toast message from the
+    // validation_errors object's KEYS (Title-Cased field names + "is"/"are required" depending on
+    // how many keys), it does NOT display professional_preferences_validator's own literal
+    // "Preferences are required" string value anywhere - that string is only ever used as an
+    // object value, never read back out. With exactly one field ("preferences") missing, the
+    // real toast singularizes to "is". Confirmed live after this assertion first failed here.
+    await expect(this.page.getByText("Preferences is required", { exact: true })).toBeVisible();
+    this.page.off("request", onRequest);
+
+    expect(requestFired).toBe(false);
+    await expect(this.preferenceSaveButton).toBeVisible();
   }
 
   /**
@@ -204,6 +250,58 @@ class ProfessionalProfilePage {
     await expect(this.page.getByText(title, { exact: false })).toBeHidden();
   }
 
+  /**
+   * A start date after the end date is rejected client-side before any request fires
+   * (app/(routes)/professional/profile/page.js's handle_update_experience: "Start month/year
+   * cannot be greater than the end month/year") - cross-field logic that lives in page.js
+   * itself, not validate/professional_profile.js, so it's untested by anything that only checks
+   * the validator file. Cancels out of the modal afterward rather than deleting a row, since
+   * nothing was ever actually added.
+   *
+   * Fills the END date input BEFORE the start one - confirmed live (a standalone repro outside
+   * this suite, instrumented with raw DOM reads after each fill) that filling start first
+   * silently resets the end date input back to empty, presumably a "changing the start date
+   * invalidates whatever end date was already picked" guard on that field's own onChange - the
+   * reverse order has no such effect. Filling start-then-end left `end_date` empty by the time
+   * Save was clicked, which instead hits professional_experience_validator's OWN "End Date is
+   * required" (validate/professional_profile.js, rendered inline in the modal via
+   * validator_error_send, not a toast) - a real, different rejection than the one this method
+   * actually means to test. Fill order genuinely matters here, not incidental.
+   */
+  async checkExperienceDateOrderRejected() {
+    await this.experienceHeading.locator("../..").getByRole("button", { name: "Add" }).click();
+    await this.page.getByRole("textbox", { name: "Enter your job title" }).fill("E2E Bad Dates Role");
+    await this.page.getByRole("textbox", { name: "Enter your company name" }).fill("E2E Bad Dates Co");
+    await this.page.getByRole("textbox", { name: "Enter a location" }).fill("Remote");
+    const monthInputs = this.page.locator('input[type="month"]');
+    await monthInputs.last().fill("2024-01");
+    await monthInputs.first().fill("2024-06");
+
+    let requestFired = false;
+    const onRequest = (req) => {
+      if (/\/professional_experience_update/.test(req.url())) requestFired = true;
+    };
+    this.page.on("request", onRequest);
+    // try/finally: this modal has no way out except its header's X or a successful Save - if the
+    // assertions below ever throw (e.g. a real product regression that stops rejecting bad
+    // dates), leaving the modal open behind a failed test would block every single test that
+    // runs after this one for the rest of this shared session (its backdrop intercepts clicks
+    // meant for the real page underneath) - confirmed the hard way, a first version of this
+    // method without this had exactly that effect. Dismissing via modalCloseButton, not
+    // modalCancelButton - confirmed live this modal (a plain Bootstrap modal-header) has no
+    // "Cancel" button at all, only the header's bare "×" icon, whose one accessible name really
+    // is "Close" (aria-label="Close" on a `btn-close` with no visible text).
+    try {
+      await this.page.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(this.page.getByText("Start month/year cannot be greater than the end month/year")).toBeVisible();
+      expect(requestFired).toBe(false);
+    } finally {
+      this.page.off("request", onRequest);
+      await this.modalCloseButton.click();
+    }
+    await expect(this.page.getByText("E2E Bad Dates Role")).toBeHidden();
+  }
+
   /** Education: same add/edit/delete pattern as Experience, via POST
    * /professional_education_update and /professional_education_delete. */
   async addThenDeleteEducation() {
@@ -226,6 +324,43 @@ class ProfessionalProfilePage {
 
     await this._deleteListEntryViaEditModal(degree, "professional_education_delete");
     await expect(this.page.getByText(degree, { exact: false })).toBeHidden();
+  }
+
+  /**
+   * Same cross-field check as checkExperienceDateOrderRejected(), against
+   * handle_update_education's identical guard in page.js. Same end-before-start fill order too -
+   * confirmed live this section has the identical "changing the start date resets/rejects an
+   * already-picked end date that would now be invalid" behavior (addThenDeleteEducation's own
+   * start-then-end fill never surfaces it, since it always fills a valid, still-empty-end-date
+   * start value first - there's nothing yet to invalidate at that point).
+   */
+  async checkEducationDateOrderRejected() {
+    await this.educationHeading.locator("../..").getByRole("button", { name: "Add" }).click();
+    await this.page.getByRole("textbox", { name: /degree/i }).first().fill("E2E Bad Dates Degree");
+    await this.page.getByRole("textbox", { name: /field of study|specialisation/i }).fill("E2E Testing");
+    await this.page.getByRole("textbox", { name: /school/i }).first().fill("E2E Bad Dates Institute");
+    await this.page.getByRole("textbox", { name: "Enter a location" }).fill("Remote");
+    const monthInputs = this.page.locator('input[type="month"]');
+    await monthInputs.last().fill("2020-01");
+    await monthInputs.first().fill("2021-01");
+
+    let requestFired = false;
+    const onRequest = (req) => {
+      if (/\/professional_education_update/.test(req.url())) requestFired = true;
+    };
+    this.page.on("request", onRequest);
+    // try/finally - see checkExperienceDateOrderRejected()'s doc comment for why this matters.
+    try {
+      await this.page.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(this.page.getByText("Start month/year cannot be greater than the end month/year")).toBeVisible();
+      expect(requestFired).toBe(false);
+    } finally {
+      this.page.off("request", onRequest);
+      // modalCloseButton, not modalCancelButton - see checkExperienceDateOrderRejected()'s doc
+      // comment: this modal has no "Cancel" button, only the header's bare "×" (aria-label="Close").
+      await this.modalCloseButton.click();
+    }
+    await expect(this.page.getByText("E2E Bad Dates Degree")).toBeHidden();
   }
 
   /**

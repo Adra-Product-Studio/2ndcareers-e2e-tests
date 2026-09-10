@@ -1,6 +1,8 @@
 // @ts-check
 const { expect } = require("@playwright/test");
 const { waitForApiDataMulti } = require("../../../support/apiEnvelope");
+const { mockApiField, clearMock } = require("../../../support/mockResponse");
+const { reapplyChatbotGuard } = require("../../../support/chatbotGuard");
 
 /**
  * /professional/learning/external_event?evt=<encrypted id>. Distinct from the internal event
@@ -131,6 +133,40 @@ class ProfessionalExternalEventPage {
     await popup.waitForLoadState().catch(() => {});
     await popup.close();
     return true;
+  }
+
+  /**
+   * A real, confirmed gap in the product code, safely observable without ever clicking the real
+   * button: RegisterButton (app/(routes)/professional/learning/external_event/page.js) only
+   * changes its LABEL when already registered ("Registered" vs "Register →") - it never actually
+   * disables itself (no `disabled` prop is ever passed to the underlying ButtonSpinner), so a
+   * second click would fire the exact same onRegister handler again. This account isn't actually
+   * registered for whichever event openFirstExternalEventDetails() landed on, so that state is
+   * forced the same way this suite reaches every other otherwise-unreachable state: intercepting
+   * this detail page's own real GET /get_training_data?id=<event> response (confirmed live -
+   * services/professional/index.js's handle_get_individual_trainings, a different query-string
+   * variant of the SAME endpoint MarketplacePage's plain listing call also uses, hence the `\?id=`
+   * anchor below) and overriding just `payment_status` on top of the real payload. Never clicks
+   * the button - the whole point is to show it's clickable when it provably shouldn't be, not to
+   * exercise whatever fires on click.
+   */
+  async checkRegisterButtonMissingDisabledState() {
+    const EVENT_ENDPOINT = /\/get_training_data\?id=/;
+    await this.page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockApiField(this.page, EVENT_ENDPOINT, (json) => {
+      json.data.data.payment_status = "paid";
+      return json;
+    });
+
+    const [response] = await Promise.all([this.page.waitForResponse(EVENT_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
+    expect(response.ok()).toBe(true);
+    await reapplyChatbotGuard(this.page);
+
+    await expect(this.registerButton).toHaveText("Registered");
+    // The real gap: still enabled, not disabled, despite the label claiming registration is done.
+    await expect(this.registerButton).toBeEnabled();
+
+    await clearMock(this.page, EVENT_ENDPOINT);
   }
 }
 

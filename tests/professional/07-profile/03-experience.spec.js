@@ -14,4 +14,9 @@ test.describe("Professional - Profile - Experience", () => {
     const profile = new ProfessionalProfilePage(session.page);
     await profile.addThenDeleteExperience();
   });
+
+  test("a start date after the end date is rejected before saving", async () => {
+    const profile = new ProfessionalProfilePage(session.page);
+    await profile.checkExperienceDateOrderRejected();
+  });
 });

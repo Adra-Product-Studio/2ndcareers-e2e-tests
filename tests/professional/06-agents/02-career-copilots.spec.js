@@ -31,6 +31,11 @@ test.describe("Professional - 2C Agents - Career Copilots", () => {
     await copilots.checkModeDropdown();
   });
 
+  test("actually selecting a mode (including the nested 2c Agents submenu) relabels the toggle", async () => {
+    const copilots = new ProfessionalCareerCopilotsPage(session.page);
+    await copilots.checkModeSelectionActuallyChangesMode();
+  });
+
   test("'Find Jobs Based on My Profile' checkbox toggles", async () => {
     const copilots = new ProfessionalCareerCopilotsPage(session.page);
     await copilots.checkProfileCheckboxToggles();
@@ -39,5 +44,10 @@ test.describe("Professional - 2C Agents - Career Copilots", () => {
   test("sending an empty message is blocked client-side, without spending a run", async () => {
     const copilots = new ProfessionalCareerCopilotsPage(session.page);
     await copilots.checkEmptyMessageIsBlocked();
+  });
+
+  test("remaining_runs mocked to 0 shows the real 'Limit has been reached' paywall", async () => {
+    const copilots = new ProfessionalCareerCopilotsPage(session.page);
+    await copilots.checkPaywallWhenNoRunsRemaining();
   });
 });

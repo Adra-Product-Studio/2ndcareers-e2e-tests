@@ -14,4 +14,9 @@ test.describe("Professional - Profile - Education", () => {
     const profile = new ProfessionalProfilePage(session.page);
     await profile.addThenDeleteEducation();
   });
+
+  test("a start date after the end date is rejected before saving", async () => {
+    const profile = new ProfessionalProfilePage(session.page);
+    await profile.checkEducationDateOrderRejected();
+  });
 });

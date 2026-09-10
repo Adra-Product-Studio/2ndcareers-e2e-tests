@@ -52,6 +52,12 @@ test.describe("Professional - Learning - external event detail", () => {
     test.skip(!opened, "No popup opened for this particular event - its registration_link may be empty in real data.");
   });
 
+  test("the Register button never actually disables itself once already registered - a real gap, confirmed without clicking it", async () => {
+    test.skip(!foundExternalEvent, "No external event was found in the first test - nothing to act on here either.");
+    const external = new ProfessionalExternalEventPage(session.page);
+    await external.checkRegisterButtonMissingDisabledState();
+  });
+
   // Whatever the two tests above found (or didn't), 06-agents needs a known-good page to enter
   // from - a specific PAID external event's own detail page was observed live (CI) to leave the
   // header's nav-link clicks unable to find their target for the rest of the test timeout,

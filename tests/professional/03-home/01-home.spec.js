@@ -8,16 +8,12 @@ const { credentialsFor } = require("../../../fixtures/credentials");
 const { hasCredentials } = credentialsFor("professional");
 
 /**
- * /professional/home. This account sits at ~53% profile completion (confirmed live), which
- * determines two independent conditionals in app/(routes)/professional/home/page.js:
- *   - dynamic_profile_content (line ~22): <60% shows the "complete your profile" CTA/copy -
- *     the >=60% bucket's CTA links to /professional/learning/hub/live_sessions, which 404s (only
- *     reachable inside the dead _learning/hub tree) - NOT triggerable with this account's real
- *     state, so that dangling-link bug is documented here rather than exercised.
- *   - render_jobs_carousel (line ~74): <=30% shows a stats-card row instead of a jobs carousel;
- *     53% is above that, so the carousel (Latest/Featured Jobs) is the branch actually covered.
- * Testing the <=30% and >=60% buckets would need a second account seeded at those percentages -
- * out of scope for this single shared account.
+ * /professional/home. This account sits at a fixed ~53% profile completion (confirmed live) -
+ * real enough for the two happy-path checks below, but real data alone can't reach every branch
+ * of app/(routes)/professional/home/page.js's profile_percentage conditionals (dynamic_profile_content,
+ * render_jobs_carousel) or the first-time-user overlay/JoyRide flow. Those are covered separately
+ * in this same folder via response mocking and cookie simulation, not skipped as out of scope:
+ * see 02-percentage-branches.spec.js and 03-first-time-overlay-and-joyride.spec.js.
  *
  * The raw JSON envelope for Home's own data (including the exact profile_percentage) is already
  * captured and verified once, in 01-login.spec.js - that post-login redirect is the one moment

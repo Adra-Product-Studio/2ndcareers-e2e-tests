@@ -19,8 +19,9 @@ test.describe("Professional - Learning - internal event detail -> Book & Pay", (
     const flow = new ProfessionalInternalEventFlow(session.page);
     // 02-see-all.spec.js's own redirect-guard checks already left the session on the marketplace
     // root - no navigation needed to get there again.
-    await flow.openFirstListingDetails(async () => {});
+    const listing = await flow.openFirstListingDetails(async () => {});
     await flow.checkDetailPage();
     await flow.goToBookAndPay();
+    await flow.checkConfirmButtonGating(listing);
   });
 });

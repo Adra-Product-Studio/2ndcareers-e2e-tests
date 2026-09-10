@@ -28,9 +28,15 @@ class HeaderMenu {
     this.jobsNavLink = page.locator("#professional_nav_jobs_link");
     this.learningNavLink = page.locator("#professional_nav_learning_link");
     this.agentsNavLink = page.locator("#professional_nav_2c_agent_link");
-    // Community's top-nav link goes off-app to an external discourse site - there's no in-app
-    // page to click-navigate to from here (see pages/professional/HomePage.js for the internal
-    // community page, reached via the home dashboard's own "COMMUNITY" quick-access card instead).
+    // json/json_data/professional/index.js's own header entry ("professional_nav_2c_exchange_link"
+    // - not "..._community_link", confirmed live) sets BOTH an external_path (the Discourse URL,
+    // target="_blank") AND its plain in-app nav_link_path ("/professional/community").
+    // components/Link/index.js's LinkComponent renders external_path as the actual <Link href>
+    // (so the click's default navigation opens Discourse in a new tab, per target), but ALSO
+    // fires onClick={() => router.push(href)} - the in-app path - on the SAME click. So this
+    // link really does open a new tab AND navigate this tab to the internal Community page, both
+    // at once - there IS a real in-app click path here after all.
+    this.communityNavLink = page.locator("#professional_nav_2c_exchange_link");
     this.myProfileLink = page.getByRole("link", { name: "My Profile" });
     this.upgradeLink = page.getByRole("link", { name: "Upgrade" });
     this.helpLink = page.getByRole("link", { name: "Help" });
@@ -56,6 +62,18 @@ class HeaderMenu {
   async goToAgents() {
     await this.agentsNavLink.click();
     await this.page.waitForURL(/\/professional\/2c_agent$/);
+  }
+
+  /** Closes the popup Discourse tab this click also opens (see communityNavLink's own doc
+   * comment) and waits for this tab's own internal navigation to land. */
+  async goToCommunity() {
+    const [popup] = await Promise.all([
+      this.page.waitForEvent("popup"),
+      this.communityNavLink.click(),
+    ]);
+    await popup.waitForLoadState().catch(() => {});
+    await popup.close();
+    await this.page.waitForURL(/\/professional\/community/);
   }
 
   /** Opens the notification bell (a real toggle - verified live, the same button closes it

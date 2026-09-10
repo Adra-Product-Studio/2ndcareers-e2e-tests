@@ -1,5 +1,9 @@
 // @ts-check
 const { expect } = require("@playwright/test");
+const { mockApiField, clearMock } = require("../../../support/mockResponse");
+const { reapplyChatbotGuard } = require("../../../support/chatbotGuard");
+
+const USAGE_ENDPOINT = /\/professional_job_recommendation_usage/;
 
 /**
  * /professional/2c_agent/career_copilots. An AI chat tool (components/reusable_page/career_copilots)
@@ -52,6 +56,75 @@ class ProfessionalCareerCopilotsPage {
     await expect(this.responseApiOption).toBeVisible();
     await this.modeDropdownButton.click();
     await expect(this.quickSearchOption).toBeHidden();
+  }
+
+  /**
+   * Actually picks a mode, not just opening/closing the dropdown - components/Button/
+   * ChatbotSelect.jsx's own toggle button relabels itself to whatever was picked (confirmed
+   * live), all local state (copilot_type/nested_parent), nothing fetched or persisted. "2c
+   * Agents" is a PARENT with its own 3-item submenu (Standard/Balanced/Advanced) - clicking it
+   * only expands that submenu without picking anything or closing the dropdown (confirmed live,
+   * ChatbotSelect's handleSelect: an option with `children` only calls setActiveParent, never
+   * onChange); the toggle only updates once a real (leaf) option is clicked, and for a nested
+   * pick reads "<parent> (<child>) ▾" (is_nested format), not just the child's own label.
+   * Restores back to Quick Search at the end - the default this account's next real search
+   * (elsewhere in this suite) assumes.
+   */
+  async checkModeSelectionActuallyChangesMode() {
+    await this.modeDropdownButton.click();
+    await this.responseApiOption.click();
+    await expect(this.page.getByRole("button", { name: "Response Api ▾", exact: true })).toBeVisible();
+
+    await this.page.getByRole("button", { name: "Response Api ▾", exact: true }).click();
+    await this.agentsOption.click();
+    const standardOption = this.page.getByRole("button", { name: "Standard", exact: true });
+    await expect(standardOption).toBeVisible();
+    // Still open, nothing picked yet - clicking a parent with children only expands its submenu.
+    await expect(this.page.getByRole("button", { name: /2c Agents \(/ })).toBeHidden();
+
+    await standardOption.click();
+    const nestedToggle = this.page.getByRole("button", { name: "2c Agents (Standard) ▾", exact: true });
+    await expect(nestedToggle).toBeVisible();
+
+    await nestedToggle.click();
+    await this.quickSearchOption.click();
+    await expect(this.modeDropdownButton).toBeVisible();
+  }
+
+  /**
+   * remaining_runs === 0 (components/reusable_page/career_copilots) replaces the jobs panel with
+   * "Limit has been reached" - forced the same way this suite reaches every other otherwise-
+   * unreachable state: intercepting this page's own real GET /professional_job_recommendation_usage
+   * response (confirmed live - services/professional/index.js, `data.data.remaining` feeds
+   * remaining_runs directly) rather than actually burning this account's real limited runs down
+   * to zero. NOTE (found via code, not tested here): remaining_runs === 0 alone isn't the real
+   * condition - it's `remaining_runs === 0 && !state.show_jobs`, so a search that already
+   * rendered jobs before the account's last run was spent would keep showing those jobs instead
+   * of this message even once truly exhausted; reproducing THAT combination would require an
+   * actual spent search first, which this suite deliberately never does (see class doc comment).
+   */
+  async checkPaywallWhenNoRunsRemaining() {
+    await this.page.unrouteAll({ behavior: "ignoreErrors" });
+    await mockApiField(this.page, USAGE_ENDPOINT, (json) => {
+      json.data.remaining = 0;
+      return json;
+    });
+
+    const [response] = await Promise.all([this.page.waitForResponse(USAGE_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
+    expect(response.ok()).toBe(true);
+    await reapplyChatbotGuard(this.page);
+
+    await expect(this.runsRemainingText).toHaveText("Runs Remaining: 0");
+    await expect(this.page.getByRole("heading", { name: "Limit has been reached" })).toBeVisible();
+    await expect(this.messageInput).toBeDisabled();
+
+    await clearMock(this.page, USAGE_ENDPOINT);
+    // Back to this account's real remaining count for anything that runs after this - leave no
+    // mocked state (even a cleared one) sitting on an already-rendered page.
+    const [restore] = await Promise.all([this.page.waitForResponse(USAGE_ENDPOINT, { timeout: 30_000 }), this.page.reload()]);
+    expect(restore.ok()).toBe(true);
+    await reapplyChatbotGuard(this.page);
+    await expect(this.naviHeading).toBeVisible();
   }
 
   /** A plain checkbox toggle - `profile_based_job` local state only, read by a search this test

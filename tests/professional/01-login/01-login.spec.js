@@ -3,6 +3,7 @@ const { test, expect } = require("@playwright/test");
 const { useSharedPage, AUTH_FILE } = require("../../../support/sharedPage");
 const { LoginPage } = require("../../../pages/LoginPage");
 const { waitForApiDataMulti } = require("../../../support/apiEnvelope");
+const { reapplyChatbotGuard } = require("../../../support/chatbotGuard");
 const { credentialsFor } = require("../../../fixtures/credentials");
 
 /**
@@ -110,10 +111,12 @@ test.describe("Professional - login", () => {
     // "framenavigated" fires ~50ms after the load event, wiping any earlier addInitScript-injected
     // DOM/state) - but NOT on any later client-side nav-link transition, so injecting once here,
     // after that settles (this test has already waited out a full login+redirect network
-    // round-trip, well past that ~50ms window), survives for the rest of the session.
-    await page.addStyleTag({
-      content: ".chatbot_container.open, .chatbot_container.open * { pointer-events: none !important; }",
-    });
+    // round-trip, well past that ~50ms window), survives for the rest of the session - UNLESS
+    // something later deliberately reloads or re-navigates (a fresh document, same as this one
+    // was), which wipes it out the same way - confirmed live, that's exactly what was happening
+    // in 03-home's own response-mocking/cookie-simulation tests before they started calling
+    // reapplyChatbotGuard() again themselves after each of their own reloads.
+    await reapplyChatbotGuard(page);
 
     // Every other file's beforeAll (support/sharedPage.js) loads this to start pre-authenticated.
     await page.context().storageState({ path: AUTH_FILE });

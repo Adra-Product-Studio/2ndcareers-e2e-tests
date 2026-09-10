@@ -2,17 +2,18 @@
 const { test } = require("@playwright/test");
 const { useSharedPage } = require("../../../support/sharedPage");
 const { ProfessionalCommunityPage } = require("../../../pages/professional/community/CommunityPage");
+const { HeaderMenu } = require("../../../pages/professional/shared/HeaderMenu");
 const { credentialsFor } = require("../../../fixtures/credentials");
 
 const { hasCredentials } = credentialsFor("professional");
 
 /**
- * /professional/community. No click path leads here any more (the home dashboard's COMMUNITY
- * card and the header's top-nav Community link both go straight to external Discourse URLs
- * instead - see HomePage.js and HeaderMenu.js) - still a live, working route, only reachable by
- * direct URL today. This is one of only 2 pages in the whole suite still entered via a real
- * page.goto() (the other is Get Support, 10-get_support) - a deliberate, documented exception,
- * not an oversight: there is genuinely no button anywhere in the app that leads here.
+ * /professional/community. The header's top-nav Community link DOES have a real in-app click
+ * path here after all (found via code, not assumed - see HeaderMenu.js's communityNavLink doc
+ * comment): the same click that opens an external Discourse tab also fires an internal
+ * router.push to this page in the current tab. The home dashboard's own "COMMUNITY" quick-access
+ * card is still purely external (HomePage.js's checkCommunityCardOpensExternalApp) - only the
+ * top-nav link does both.
  */
 test.describe("Professional - Community", () => {
   const session = useSharedPage(test);
@@ -20,6 +21,10 @@ test.describe("Professional - Community", () => {
 
   test("loads with the expected data", async () => {
     const community = new ProfessionalCommunityPage(session.page);
-    await community.waitForLoad();
+    const header = new HeaderMenu(session.page);
+    // 07-profile left the session on /professional/profile - arrive here via the real top-nav
+    // Community link click (closing the Discourse popup it also opens) rather than a fresh
+    // page.goto().
+    await community.waitForLoad(() => header.goToCommunity());
   });
 });

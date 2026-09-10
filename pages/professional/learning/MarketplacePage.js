@@ -14,9 +14,11 @@ const { waitForApiData } = require("../../../support/apiEnvelope");
  * Stay Tuned!", Learn Live, On Demand, Resources, Perspectives.
  *
  * "Connect with Experts" and "Learn Live" each show a live "<N> Listings" count next to their
- * title - their own "See all N →" BUTTON only renders once N > 3 (verified live at 139 and 9
- * listings). That button doesn't go anywhere yet either way (verified live - clicking it is a
- * no-op), so this only checks its conditional visibility, not a destination.
+ * title - their own "See all N →" BUTTON only renders once N > 3 (verified live: both real
+ * sections sit well past that today), and is a real expand/collapse toggle
+ * (app/(routes)/professional/learning/page.js's ListingSection: defaultCount flips between 3 and
+ * null), not a navigation - clicking it reveals every listing in that section and relabels itself
+ * "Show less", confirmed live.
  *
  * On Demand/Resources/Perspectives are different: their "See all N ..." is plain clickable text
  * (not a real link/button element) that navigates to /professional/learning/see_all?q=<recording|
@@ -69,24 +71,44 @@ class ProfessionalMarketplacePage {
     }
   }
 
-  /** Reads a section's "<N> Listings" count and confirms its "See all" button only shows when
-   * N > 3 - the rule observed live (139 and 9 listings both showed the button). */
+  /**
+   * Reads a section's "<N> Listings" count, confirms its "See all" button only shows when N > 3
+   * (the rule observed live - 139 and 9 listings both showed the button), and when it does,
+   * clicks all the way through the real expand/collapse cycle: See all -> every one of the N
+   * cards is now visible and the button relabels to "Show less" -> Show less -> back down to
+   * exactly 3 cards and the original "See all N →" label. Leaves the section collapsed again
+   * afterward, matching how it was found.
+   */
   async _checkSeeAllVisibilityFollowsCountRule(sectionTitleLocator) {
     await sectionTitleLocator.scrollIntoViewIfNeeded();
     // Two levels up from the title lands on the section wrapper that also contains the
-    // "<N> Listings" count and the "See all" button as siblings - verified against the live
-    // DOM (see class doc comment).
+    // "<N> Listings" count, the cards themselves, and the "See all" button as siblings -
+    // verified against the live DOM (see class doc comment).
     const section = sectionTitleLocator.locator("..").locator("..");
     const countText = (await section.getByText(/^\d+ Listings$/).textContent()) || "";
     const count = parseInt(countText, 10);
     expect(Number.isNaN(count)).toBe(false);
 
     const seeAllButton = section.getByRole("button", { name: /See all \d+ →/ });
-    if (count > 3) {
-      await expect(seeAllButton).toBeVisible();
-    } else {
+    const showLessButton = section.getByRole("button", { name: "Show less" });
+    const cards = section.locator(".connect_with_experts_card");
+
+    if (count <= 3) {
       await expect(seeAllButton).toBeHidden();
+      return count;
     }
+
+    await expect(seeAllButton).toBeVisible();
+    expect(await cards.count()).toBe(3);
+
+    await seeAllButton.click();
+    await expect(showLessButton).toBeVisible();
+    expect(await cards.count()).toBe(count);
+
+    await showLessButton.click();
+    await expect(seeAllButton).toBeVisible();
+    expect(await cards.count()).toBe(3);
+
     return count;
   }
 
