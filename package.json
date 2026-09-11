@@ -11,7 +11,9 @@
     "test:e2e:chrome": "cross-env PW_SLOWMO=1200 PW_MAXIMIZE=true PW_OPEN_REPORT=true playwright test --project=chrome --headed --workers=1",
     "test:e2e:report": "playwright show-report",
     "report:pdf": "node scripts/report-to-pdf.js",
-    "report:video": "node scripts/merge-videos.js"
+    "report:video": "node scripts/merge-videos.js",
+    "test:e2e:tracked": "node scripts/run-tracked-regression.js",
+    "test:e2e:tracked:headed": "cross-env SIGNUP_LOG_HEADED=true PW_SLOWMO=1200 PW_MAXIMIZE=true node scripts/run-tracked-regression.js"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",

@@ -27,8 +27,14 @@ if (!BASE_URL) {
 // Slows down every action (fill, click, etc.) by this many ms so a headed run is watchable.
 const SLOW_MO = Number(process.env.PW_SLOWMO) || 0;
 
-// Launches Chrome maximized to the full screen instead of the default 1280x720 window.
+// Launches Chrome at a large, fixed window size instead of the default 1280x720 window. A FIXED
+// size set at launch, not native OS maximize (--start-maximized) - that resizes the window AFTER
+// launch, which was confirmed live to invalidate Google Places Autocomplete's own dropdown
+// position calculation (About You's city field) mid-run. Setting matching --window-size args and
+// a same-size viewport up front means the window is already at its final size before any page
+// ever loads, so nothing resizes out from under a page that's already rendered.
 const MAXIMIZE = process.env.PW_MAXIMIZE === "true";
+const FIXED_WINDOW_SIZE = { width: 1600, height: 900 };
 
 // Auto-opens the HTML report in the browser once the run finishes.
 const OPEN_REPORT = process.env.PW_OPEN_REPORT === "true";
@@ -69,10 +75,12 @@ module.exports = defineConfig({
     // Recording is requested directly on each file's newContext() call instead, keyed by
     // `videoName` - one continuous .webm per spec file, which scripts/merge-videos.js then
     // stitches into the single file CI uploads as e2e-automation-<sha>.
-    viewport: MAXIMIZE ? null : undefined,
+    viewport: MAXIMIZE ? FIXED_WINDOW_SIZE : undefined,
     launchOptions: {
       slowMo: SLOW_MO,
-      args: MAXIMIZE ? ["--start-maximized"] : [],
+      args: MAXIMIZE
+        ? [`--window-size=${FIXED_WINDOW_SIZE.width},${FIXED_WINDOW_SIZE.height}`, "--window-position=20,20"]
+        : [],
     },
   },
   projects: [

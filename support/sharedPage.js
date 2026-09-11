@@ -68,4 +68,18 @@ async function closeSharedSession() {
   }
 }
 
-module.exports = { useSharedPage, closeSharedSession, AUTH_FILE, VIDEO_DIR };
+/**
+ * Hands this module an ALREADY-OPEN context/page to reuse instead of creating its own from
+ * storageState - only meaningful within the SAME Playwright project/invocation as whoever calls
+ * this (module state doesn't survive across separate `npx playwright test` processes or across
+ * Playwright `projects`, confirmed live), used by tests/00-signup-flow/professional's own last
+ * file to continue this suite as a real, freshly-created account instead of the usual stored one.
+ * A no-op if this module already has a context (never overrides an in-progress session).
+ */
+function seedSharedPage(context, page) {
+  if (sharedContext) return;
+  sharedContext = context;
+  sharedPage = page;
+}
+
+module.exports = { useSharedPage, closeSharedSession, seedSharedPage, AUTH_FILE, VIDEO_DIR };

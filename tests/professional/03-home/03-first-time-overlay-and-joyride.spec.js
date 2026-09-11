@@ -43,6 +43,14 @@ const { hasCredentials } = credentialsFor("professional");
 test.describe("Professional - Home - first-time-user overlay -> JoyRide", () => {
   const session = useSharedPage(test);
   test.skip(!hasCredentials, "Set PROFESSIONAL_TEST_EMAIL / PROFESSIONAL_TEST_PASSWORD in .env.test to run this - it needs 01-login to have signed in first.");
+  // Skipped: this whole file's premise is faking error_code:200 on this shared, already-onboarded
+  // account because it can never genuinely receive that response for real (see the file's own
+  // docstring above for exactly why that was the right call at the time). tests/00-signup-flow now
+  // covers this identical scenario - overlay open, real completion, JoyRide, percentage-branch
+  // content - end to end against a real freshly-created account and a real, unmodified response,
+  // making this mocked simulation redundant. Kept here (not deleted) as a reference for the mocking
+  // technique in case it's ever needed again, not because it should still run.
+  test.skip(true, "Superseded by the real, unmocked equivalent in tests/00-signup-flow/professional/05-first-time-home.spec.js.");
 
   const HOME_ENDPOINT = /\/professional_updated_home/;
   let originalCookie;
